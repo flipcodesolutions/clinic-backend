@@ -30,6 +30,33 @@ const StaffProfile = sequelize.define(
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
+
+    employee_code: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      unique: true,
+    },
+
+    salary: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+
+    department: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+
+    shift: {
+      type: DataTypes.ENUM("morning", "evening", "night"),
+      allowNull: true,
+    },
+
+    experience_years: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      defaultValue: 0,
+    },
   },
   {
     tableName: "staff_profiles",

@@ -89,6 +89,51 @@ const PatientProfile = sequelize.define(
       type: DataTypes.STRING(20),
       allowNull: true,
     },
+
+    primary_doctor_id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: true,
+    },
+
+    aadhaar_number: {
+      type: DataTypes.STRING(12),
+      allowNull: true,
+    },
+
+    diabetes: {
+      type: DataTypes.ENUM("yes", "no"),
+      allowNull: true,
+    },
+
+    blood_pressure: {
+      type: DataTypes.ENUM("normal", "high"),
+      allowNull: true,
+    },
+
+    allergy: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+
+    chronic_disease: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+
+    smoking: {
+      type: DataTypes.ENUM("yes", "no"),
+      allowNull: true,
+    },
+
+    alcohol: {
+      type: DataTypes.ENUM("yes", "no"),
+      allowNull: true,
+    },
+
+    medical_notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   {
     tableName: "patient_profiles",

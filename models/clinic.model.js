@@ -20,6 +20,11 @@ const Clinic = sequelize.define(
       allowNull: true,
     },
 
+    gst_number: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+
     email: {
       type: DataTypes.STRING(150),
       allowNull: true,

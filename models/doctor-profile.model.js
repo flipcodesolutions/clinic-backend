@@ -62,6 +62,21 @@ const DoctorProfile = sequelize.define(
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
+
+    department: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+
+    opd_timing: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+
+    profile_image: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     tableName: "doctor_profiles",

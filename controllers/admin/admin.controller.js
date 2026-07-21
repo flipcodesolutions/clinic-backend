@@ -7,6 +7,7 @@ const {
   Setting,
 } = require("../../models");
 
+const { Op } = require("sequelize");
 function publicUser(user) {
   const data = user.toJSON();
   delete data.password;
@@ -14,18 +15,49 @@ function publicUser(user) {
 }
 
 // Clinics
+
 const listClinics = async (req, res) => {
   try {
-    const clinics = await Clinic.findAll({ order: [["id", "DESC"]] });
-    return res.json({ success: true, data: clinics });
+    const { search, status } = req.query;
+
+    const where = {};
+
+    // Search by clinic name
+    if (search) {
+      where.clinicName = {
+        [Op.like]: `%${search}%`,
+      };
+    }
+
+    // Filter by status
+    if (status) {
+      where.status = status;
+    }
+
+    const clinics = await Clinic.findAll({
+      where,
+      order: [["id", "DESC"]],
+    });
+
+    return res.json({
+      success: true,
+      count: clinics.length,
+      data: clinics,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
 const createClinic = async (req, res) => {
   try {
-    const clinic = await Clinic.create({ ...req.body, created_by: req.user.id });
+    const clinic = await Clinic.create({
+      ...req.body,
+      created_by: req.user.id,
+    });
     return res.status(201).json({ success: true, data: clinic });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -36,7 +68,9 @@ const getClinic = async (req, res) => {
   try {
     const clinic = await Clinic.findByPk(req.params.id);
     if (!clinic) {
-      return res.status(404).json({ success: false, message: "Clinic not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Clinic not found" });
     }
     return res.json({ success: true, data: clinic });
   } catch (error) {
@@ -48,7 +82,9 @@ const updateClinic = async (req, res) => {
   try {
     const clinic = await Clinic.findByPk(req.params.id);
     if (!clinic) {
-      return res.status(404).json({ success: false, message: "Clinic not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Clinic not found" });
     }
     await clinic.update(req.body);
     return res.json({ success: true, data: clinic });
@@ -61,7 +97,9 @@ const deleteClinic = async (req, res) => {
   try {
     const clinic = await Clinic.findByPk(req.params.id);
     if (!clinic) {
-      return res.status(404).json({ success: false, message: "Clinic not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Clinic not found" });
     }
     await clinic.destroy();
     return res.json({ success: true, message: "Clinic deleted" });
@@ -84,7 +122,9 @@ const createDepartment = async (req, res) => {
   try {
     const { name, description, status } = req.body;
     if (!name) {
-      return res.status(400).json({ success: false, message: "name is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "name is required" });
     }
     const department = await Department.create({ name, description, status });
     return res.status(201).json({ success: true, data: department });
@@ -97,7 +137,9 @@ const updateDepartment = async (req, res) => {
   try {
     const department = await Department.findByPk(req.params.id);
     if (!department) {
-      return res.status(404).json({ success: false, message: "Department not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Department not found" });
     }
     await department.update(req.body);
     return res.json({ success: true, data: department });
@@ -110,7 +152,9 @@ const deleteDepartment = async (req, res) => {
   try {
     const department = await Department.findByPk(req.params.id);
     if (!department) {
-      return res.status(404).json({ success: false, message: "Department not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Department not found" });
     }
     await department.destroy();
     return res.json({ success: true, message: "Department deleted" });
@@ -133,7 +177,9 @@ const createService = async (req, res) => {
   try {
     const { name, description, price, status } = req.body;
     if (!name) {
-      return res.status(400).json({ success: false, message: "name is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "name is required" });
     }
     const service = await Service.create({ name, description, price, status });
     return res.status(201).json({ success: true, data: service });
@@ -146,7 +192,9 @@ const updateService = async (req, res) => {
   try {
     const service = await Service.findByPk(req.params.id);
     if (!service) {
-      return res.status(404).json({ success: false, message: "Service not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Service not found" });
     }
     await service.update(req.body);
     return res.json({ success: true, data: service });
@@ -159,7 +207,9 @@ const deleteService = async (req, res) => {
   try {
     const service = await Service.findByPk(req.params.id);
     if (!service) {
-      return res.status(404).json({ success: false, message: "Service not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Service not found" });
     }
     await service.destroy();
     return res.json({ success: true, message: "Service deleted" });
@@ -171,10 +221,37 @@ const deleteService = async (req, res) => {
 // Cities
 const listCities = async (req, res) => {
   try {
-    const cities = await City.findAll({ order: [["name", "ASC"]] });
-    return res.json({ success: true, data: cities });
+    const { search, status } = req.query;
+
+    const where = {};
+
+    // Search by city name
+    if (search) {
+      where.name = {
+        [Op.like]: `%${search}%`,
+      };
+    }
+
+    // Filter by status
+    if (status) {
+      where.status = status;
+    }
+
+    const cities = await City.findAll({
+      where,
+      order: [["name", "ASC"]],
+    });
+
+    return res.json({
+      success: true,
+      count: cities.length,
+      data: cities,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -182,7 +259,9 @@ const createCity = async (req, res) => {
   try {
     const { name, status } = req.body;
     if (!name) {
-      return res.status(400).json({ success: false, message: "name is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "name is required" });
     }
     const city = await City.create({ name, status });
     return res.status(201).json({ success: true, data: city });
@@ -195,7 +274,9 @@ const updateCity = async (req, res) => {
   try {
     const city = await City.findByPk(req.params.id);
     if (!city) {
-      return res.status(404).json({ success: false, message: "City not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "City not found" });
     }
     await city.update(req.body);
     return res.json({ success: true, data: city });
@@ -208,7 +289,9 @@ const deleteCity = async (req, res) => {
   try {
     const city = await City.findByPk(req.params.id);
     if (!city) {
-      return res.status(404).json({ success: false, message: "City not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "City not found" });
     }
     await city.destroy();
     return res.json({ success: true, message: "City deleted" });
@@ -234,11 +317,15 @@ const updateUserStatus = async (req, res) => {
   try {
     const { status } = req.body;
     if (!["active", "inactive", "blocked"].includes(status)) {
-      return res.status(400).json({ success: false, message: "Invalid status" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid status" });
     }
     const user = await User.findByPk(req.params.id);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
     await user.update({ status });
     return res.json({ success: true, data: publicUser(user) });
@@ -261,14 +348,20 @@ const upsertSetting = async (req, res) => {
   try {
     const { setting_key, setting_value, description } = req.body;
     if (!setting_key) {
-      return res.status(400).json({ success: false, message: "setting_key is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "setting_key is required" });
     }
 
     let setting = await Setting.findOne({ where: { setting_key } });
     if (setting) {
       await setting.update({ setting_value, description });
     } else {
-      setting = await Setting.create({ setting_key, setting_value, description });
+      setting = await Setting.create({
+        setting_key,
+        setting_value,
+        description,
+      });
     }
 
     return res.json({ success: true, data: setting });

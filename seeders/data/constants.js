@@ -65,6 +65,29 @@ const DOCTORS_PER_HOSPITAL = 10;
 const STAFF_PER_HOSPITAL = 10;
 const PATIENTS_PER_HOSPITAL = 25;
 
+/** Master services offered by hospitals */
+const SERVICES = [
+  { name: "General Consultation", price: 300, description: "OPD general consultation" },
+  { name: "ECG", price: 400, description: "Electrocardiogram test" },
+  { name: "Blood Test - CBC", price: 350, description: "Complete blood count" },
+  { name: "X-Ray", price: 500, description: "Digital X-Ray imaging" },
+  { name: "Ultrasound", price: 800, description: "Ultrasound scan" },
+  { name: "Physiotherapy Session", price: 450, description: "Single physiotherapy session" },
+  { name: "Dental Cleaning", price: 600, description: "Professional dental cleaning" },
+  { name: "Eye Checkup", price: 350, description: "Complete eye examination" },
+  { name: "Vaccination", price: 700, description: "Standard vaccination dose" },
+  { name: "Emergency Care", price: 1500, description: "Emergency consultation & first aid" },
+];
+
+const WEEKDAYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
 module.exports = {
   CITY_NAME,
   HOSPITALS,
@@ -76,4 +99,6 @@ module.exports = {
   DOCTORS_PER_HOSPITAL,
   STAFF_PER_HOSPITAL,
   PATIENTS_PER_HOSPITAL,
+  SERVICES,
+  WEEKDAYS,
 };

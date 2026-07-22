@@ -219,9 +219,15 @@ const deleteService = async (req, res) => {
 };
 
 // Cities
+
 const listCities = async (req, res) => {
   try {
     const { search, status } = req.query;
+
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 1;
+    const offset = (page - 1) * limit;
 
     const where = {};
 
@@ -237,14 +243,19 @@ const listCities = async (req, res) => {
       where.status = status;
     }
 
-    const cities = await City.findAll({
+    const { count, rows: cities } = await City.findAndCountAll({
       where,
       order: [["name", "ASC"]],
+      limit,
+      offset,
     });
 
     return res.json({
       success: true,
-      count: cities.length,
+      count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+      limit,
       data: cities,
     });
   } catch (error) {
@@ -254,7 +265,6 @@ const listCities = async (req, res) => {
     });
   }
 };
-
 const getCityById = async (req, res) => {
   try {
     const city = await City.findByPk(req.params.id);

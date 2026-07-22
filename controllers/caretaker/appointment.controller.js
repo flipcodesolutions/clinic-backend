@@ -1,73 +1,5 @@
-const {
-  CareTakerProfile,
-  PatientCareTaker,
-  PatientProfile,
-  Appointment,
-  User,
-} = require("../../models");
-
-async function getCareTakerProfile(userId) {
-  return CareTakerProfile.findOne({ where: { user_id: userId } });
-}
-
-const getProfile = async (req, res) => {
-  try {
-    let profile = await getCareTakerProfile(req.user.id);
-    if (!profile) {
-      profile = await CareTakerProfile.create({ user_id: req.user.id });
-    }
-    return res.json({ success: true, data: profile });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-const updateProfile = async (req, res) => {
-  try {
-    let profile = await getCareTakerProfile(req.user.id);
-    if (!profile) {
-      profile = await CareTakerProfile.create({ user_id: req.user.id, ...req.body });
-    } else {
-      await profile.update(req.body);
-    }
-    return res.json({ success: true, data: profile });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-const listPatients = async (req, res) => {
-  try {
-    const profile = await getCareTakerProfile(req.user.id);
-    if (!profile) {
-      return res.status(404).json({ success: false, message: "Caretaker profile not found" });
-    }
-
-    const links = await PatientCareTaker.findAll({
-      where: { caretaker_id: profile.id },
-    });
-    const patientIds = links.map((l) => l.patient_id);
-
-    if (!patientIds.length) {
-      return res.json({ success: true, data: [] });
-    }
-
-    const patients = await PatientProfile.findAll({
-      where: { id: patientIds },
-      include: [
-        {
-          model: User,
-          as: "user",
-          attributes: { exclude: ["password"] },
-        },
-      ],
-    });
-
-    return res.json({ success: true, data: patients });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+const { PatientCareTaker, Appointment } = require("../../models");
+const { getCareTakerProfile } = require("./helpers");
 
 const listAppointments = async (req, res) => {
   try {
@@ -157,9 +89,6 @@ const bookAppointment = async (req, res) => {
 };
 
 module.exports = {
-  getProfile,
-  updateProfile,
-  listPatients,
   listAppointments,
   bookAppointment,
 };

@@ -255,6 +255,19 @@ const listCities = async (req, res) => {
   }
 };
 
+const getCityById = async (req, res) => {
+  try {
+    const city = await City.findByPk(req.params.id);
+    if (!city) {
+      return res
+        .status(404)
+        .json({ success: false, message: "City not found" });
+    }
+    return res.json({ success: true, data: city });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 const createCity = async (req, res) => {
   try {
     const { name, status } = req.body;
@@ -388,6 +401,7 @@ module.exports = {
   createCity,
   updateCity,
   deleteCity,
+  getCityById,
   listUsers,
   updateUserStatus,
   listSettings,

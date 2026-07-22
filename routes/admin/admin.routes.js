@@ -24,6 +24,7 @@ router.put("/services/:id", adminController.updateService);
 router.delete("/services/:id", adminController.deleteService);
 
 router.get("/cities", adminController.listCities);
+router.get("/city/:id", adminController.getCityById);
 router.post("/cities", adminController.createCity);
 router.put("/cities/:id", adminController.updateCity);
 router.delete("/cities/:id", adminController.deleteCity);

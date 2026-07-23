@@ -4,6 +4,9 @@ const { Clinic } = require("../../models");
 const listClinics = async (req, res) => {
   try {
     const { search, status } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
     const where = {};
 
     if (search) {
@@ -13,14 +16,19 @@ const listClinics = async (req, res) => {
       where.status = status;
     }
 
-    const clinics = await Clinic.findAll({
+    const { count, rows: clinics } = await Clinic.findAndCountAll({
       where,
-      order: [["id", "DESC"]],
+      order: [["name", "ASC"]],
+      limit,
+      offset,
     });
 
     return res.json({
       success: true,
-      count: clinics.length,
+      count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+      limit,
       data: clinics,
     });
   } catch (error) {
@@ -32,7 +40,7 @@ const createClinic = async (req, res) => {
   try {
     const clinic = await Clinic.create({
       ...req.body,
-      created_by: req.user.id,
+      created_by: req.user ? req.user.id : null,
     });
     return res.status(201).json({ success: true, data: clinic });
   } catch (error) {

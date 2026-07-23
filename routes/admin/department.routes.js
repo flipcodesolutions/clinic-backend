@@ -4,6 +4,7 @@ const departmentController = require("../../controllers/admin/department.control
 const router = express.Router();
 
 router.get("/", departmentController.listDepartments);
+router.get("/:id", departmentController.getDepartmentById);
 router.post("/", departmentController.createDepartment);
 router.put("/:id", departmentController.updateDepartment);
 router.delete("/:id", departmentController.deleteDepartment);

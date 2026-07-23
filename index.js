@@ -50,7 +50,7 @@ async function start() {
     if (error.parent) console.error('DB error:', error.parent.message || error.parent);
     if (error.errors) console.error('Details:', error.errors);
     if (error.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use. Stop the other process or change PORT in .env`);
+      console.error(`Port ${PORT} is already in use. Stop the other process or change PORT in .env`); 
     }
     process.exit(1);
   }

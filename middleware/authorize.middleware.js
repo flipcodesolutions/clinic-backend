@@ -1,8 +1,18 @@
 function authorize(...allowedRoles) {
   return (req, res, next) => {
-    const userRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+    let userRoles = req.user?.roles || [];
 
-    const hasAccess = allowedRoles.some((role) => userRoles.includes(role));
+    if (typeof userRoles === "string") {
+      try {
+        userRoles = JSON.parse(userRoles);
+      } catch (e) {
+        userRoles = [userRoles];
+      }
+    }
+
+    const rolesArray = Array.isArray(userRoles) ? userRoles : [];
+
+    const hasAccess = allowedRoles.some((role) => rolesArray.includes(role));
     if (!hasAccess) {
       return res.status(403).json({
         success: false,

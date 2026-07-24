@@ -47,10 +47,17 @@ const User = sequelize.define(
       type: DataTypes.JSON,
       allowNull: false,
       defaultValue: ["patient"],
-      // Example:
-      // ["super_admin"]
-      // ["doctor","patient"]
-      // ["receptionist"]
+      get() {
+        const rawValue = this.getDataValue("roles");
+        if (typeof rawValue === "string") {
+          try {
+            return JSON.parse(rawValue);
+          } catch (e) {
+            return [rawValue];
+          }
+        }
+        return Array.isArray(rawValue) ? rawValue : [];
+      },
     },
 
     profile_image: {

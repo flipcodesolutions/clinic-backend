@@ -18,6 +18,7 @@ const { seedPatients } = require("./patient.seeder");
 const { seedCaretakers } = require("./caretaker.seeder");
 const { seedAppointments } = require("./appointment.seeder");
 const { seedClinicalData } = require("./clinical-data.seeder");
+const { seedSuperAdmin } = require("./super-admin.seeder");
 const { DEFAULT_PASSWORD } = require("./data/constants");
 
 /**
@@ -28,8 +29,9 @@ async function run() {
   console.log("\n🌱 Starting clinic database seed...\n");
 
   try {
-    await syncDatabase({ alter: true });
+    await syncDatabase({ force: true });
 
+    await seedSuperAdmin();
     const city = await seedCity();
     const clinics = await seedHospitals(city);
 

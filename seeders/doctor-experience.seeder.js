@@ -26,10 +26,10 @@ async function seedDoctorExperiences(doctorsByClinic) {
       const experienceCount = faker.number.int({ min: 1, max: 2 });
 
       for (let i = 0; i < experienceCount; i += 1) {
-        const start = faker.date.past({ years: 12 + i * 3 });
+        const start = faker.date.past({ years: 10 + i * 2 });
         const end = faker.date.between({
           from: start,
-          to: faker.date.past({ years: 1 }),
+          to: new Date(),
         });
 
         await DoctorExperience.create({

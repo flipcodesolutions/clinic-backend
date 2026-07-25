@@ -8,16 +8,24 @@ const departmentRoutes = require("./department.routes");
 const serviceRoutes = require("./service.routes");
 const userRoutes = require("./user.routes");
 const settingRoutes = require("./setting.routes");
+const galleryRoutes = require("./gallery.routes");
+const clinicDepartmentRoutes = require("./clinic-department.routes");
+const clinicServiceRoutes = require("./clinic-service.routes");
+const { getClinicDashboard } = require("../../controllers/admin/dashboard.controller");
 
 const router = express.Router();
 
-router.use(authenticate, authorize("super_admin"));
+router.use(authenticate, authorize("super_admin", "clinic_admin"));
 
+router.get("/dashboard", getClinicDashboard);
 router.use("/cities", cityRoutes);
 router.use("/clinics", clinicRoutes);
 router.use("/departments", departmentRoutes);
 router.use("/services", serviceRoutes);
 router.use("/users", userRoutes);
 router.use("/settings", settingRoutes);
+router.use("/gallery", galleryRoutes);
+router.use("/clinic-departments", clinicDepartmentRoutes);
+router.use("/clinic-services", clinicServiceRoutes);
 
 module.exports = router;

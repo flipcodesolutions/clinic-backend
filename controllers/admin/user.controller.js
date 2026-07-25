@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
-const { User, Clinic, ClinicUser, sequelize } = require("../../models");
+const { User, Clinic, ClinicUser, DoctorProfile, StaffProfile, sequelize } = require("../../models");
+const { deleteOldFile } = require("../../utils/file.utils");
 
 function publicUser(user) {
   const data = user.toJSON();
@@ -49,6 +50,14 @@ const listUsers = async (req, res) => {
           attributes: ["id", "name", "city"],
           through: { attributes: [] },
         },
+        {
+          model: DoctorProfile,
+          as: "doctorProfile",
+        },
+        {
+          model: StaffProfile,
+          as: "staffProfile",
+        },
       ],
       order: [["id", "DESC"]],
       limit,
@@ -91,6 +100,14 @@ const getUserById = async (req, res) => {
           attributes: ["id", "name", "city"],
           through: { attributes: [] },
         },
+        {
+          model: DoctorProfile,
+          as: "doctorProfile",
+        },
+        {
+          model: StaffProfile,
+          as: "staffProfile",
+        },
       ],
     });
     if (!user) {
@@ -104,12 +121,43 @@ const getUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { first_name, last_name, email, phone, password, roles, status, clinic_id } = req.body;
+    const {
+      first_name,
+      last_name,
+      email,
+      phone,
+      password,
+      roles,
+      status,
+      clinic_id,
+      // DoctorProfile fields
+      registration_no,
+      qualification,
+      specialization,
+      experience_years,
+      consultation_fee,
+      bio,
+      languages,
+      gender,
+      dob,
+      photo_url,
+      // StaffProfile fields
+      designation,
+      shift,
+    } = req.body;
 
     if (!first_name || !email || !phone || !password) {
       return res.status(400).json({
         success: false,
         message: "First name, email, phone, and password are required",
+      });
+    }
+
+    const cleanPhone = String(phone).replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number must be exactly 10 digits",
       });
     }
 
@@ -146,7 +194,43 @@ const createUser = async (req, res) => {
       });
     }
 
-    return res.status(201).json({ success: true, data: publicUser(user) });
+    // Handle DoctorProfile if role includes doctor or profile details passed
+    if (userRoles.includes("doctor") || specialization || registration_no || qualification) {
+      await DoctorProfile.create({
+        user_id: user.id,
+        registration_no: registration_no || null,
+        qualification: qualification || null,
+        specialization: specialization || null,
+        experience_years: parseInt(experience_years) || 0,
+        consultation_fee: parseFloat(consultation_fee) || 0,
+        bio: bio || null,
+        languages: languages ? (typeof languages === "string" ? languages.split(",").map(s => s.trim()) : languages) : null,
+        gender: gender || null,
+        dob: dob || null,
+        profile_image: photo_url || null,
+      });
+    }
+
+    // Handle StaffProfile if designation or shift passed or staff roles
+    const isStaffRole = userRoles.some(r => ["staff", "receptionist", "nurse", "caretaker"].includes(r));
+    if (isStaffRole || designation || shift) {
+      const validShift = ["morning", "evening", "night"].includes(shift?.toLowerCase()) ? shift.toLowerCase() : null;
+      await StaffProfile.create({
+        user_id: user.id,
+        designation: designation || (userRoles[0] ? userRoles[0].charAt(0).toUpperCase() + userRoles[0].slice(1) : "Staff"),
+        shift: validShift,
+      });
+    }
+
+    const userWithProfile = await User.findByPk(user.id, {
+      attributes: { exclude: ["password"] },
+      include: [
+        { model: DoctorProfile, as: "doctorProfile" },
+        { model: StaffProfile, as: "staffProfile" },
+      ],
+    });
+
+    return res.status(201).json({ success: true, data: publicUser(userWithProfile) });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -159,12 +243,44 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const { first_name, last_name, email, phone, password, roles, status, clinic_id } = req.body;
+    const {
+      first_name,
+      last_name,
+      email,
+      phone,
+      password,
+      roles,
+      status,
+      clinic_id,
+      // DoctorProfile fields
+      registration_no,
+      qualification,
+      specialization,
+      experience_years,
+      consultation_fee,
+      bio,
+      languages,
+      gender,
+      dob,
+      photo_url,
+      designation,
+      shift,
+    } = req.body;
 
     if (email && email !== user.email) {
       const existingEmail = await User.findOne({ where: { email } });
       if (existingEmail) {
         return res.status(400).json({ success: false, message: "Email is already registered" });
+      }
+    }
+
+    if (phone) {
+      const cleanPhone = String(phone).replace(/\D/g, "");
+      if (cleanPhone.length !== 10) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone number must be exactly 10 digits",
+        });
       }
     }
 
@@ -205,7 +321,54 @@ const updateUser = async (req, res) => {
       }
     }
 
-    return res.json({ success: true, data: publicUser(user) });
+    // Update or Create DoctorProfile
+    const profileData = {};
+    if (registration_no !== undefined) profileData.registration_no = registration_no;
+    if (qualification !== undefined) profileData.qualification = qualification;
+    if (specialization !== undefined) profileData.specialization = specialization;
+    if (experience_years !== undefined) profileData.experience_years = parseInt(experience_years) || 0;
+    if (consultation_fee !== undefined) profileData.consultation_fee = parseFloat(consultation_fee) || 0;
+    if (bio !== undefined) profileData.bio = bio;
+    if (languages !== undefined) profileData.languages = typeof languages === "string" ? languages.split(",").map(s => s.trim()) : languages;
+    if (gender !== undefined) profileData.gender = gender;
+    if (dob !== undefined) profileData.dob = dob;
+    if (photo_url !== undefined) profileData.profile_image = photo_url;
+
+    if (Object.keys(profileData).length > 0) {
+      const existingProfile = await DoctorProfile.findOne({ where: { user_id: user.id } });
+      if (photo_url && existingProfile && existingProfile.profile_image && existingProfile.profile_image !== photo_url) {
+        deleteOldFile(existingProfile.profile_image);
+      }
+      const [doctorProfile] = await DoctorProfile.findOrCreate({
+        where: { user_id: user.id },
+        defaults: { user_id: user.id, ...profileData },
+      });
+      await doctorProfile.update(profileData);
+    }
+
+    // Update or Create StaffProfile
+    const staffData = {};
+    if (designation !== undefined) staffData.designation = designation;
+    if (shift !== undefined) {
+      staffData.shift = ["morning", "evening", "night"].includes(shift?.toLowerCase()) ? shift.toLowerCase() : null;
+    }
+    if (Object.keys(staffData).length > 0) {
+      const [staffProfile] = await StaffProfile.findOrCreate({
+        where: { user_id: user.id },
+        defaults: { user_id: user.id, ...staffData },
+      });
+      await staffProfile.update(staffData);
+    }
+
+    const updatedUser = await User.findByPk(user.id, {
+      attributes: { exclude: ["password"] },
+      include: [
+        { model: DoctorProfile, as: "doctorProfile" },
+        { model: StaffProfile, as: "staffProfile" },
+      ],
+    });
+
+    return res.json({ success: true, data: publicUser(updatedUser) });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -234,6 +397,12 @@ const deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    const docProfile = await DoctorProfile.findOne({ where: { user_id: user.id } });
+    if (docProfile && docProfile.profile_image) {
+      deleteOldFile(docProfile.profile_image);
+    }
+    await DoctorProfile.destroy({ where: { user_id: user.id } });
+    await StaffProfile.destroy({ where: { user_id: user.id } });
     await user.destroy();
     return res.json({ success: true, message: "User deleted successfully" });
   } catch (error) {
@@ -249,4 +418,3 @@ module.exports = {
   updateUserStatus,
   deleteUser,
 };
-

@@ -1,5 +1,5 @@
 const express = require("express");
-const settingController = require("../../controllers/admin/setting.controller");
+const settingController = require("../../controllers/clinic/setting.controller");
 
 const router = express.Router();
 

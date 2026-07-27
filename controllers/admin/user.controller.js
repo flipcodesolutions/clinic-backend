@@ -220,7 +220,6 @@ const createUser = async (req, res) => {
       photo_url,
       // StaffProfile fields
       designation,
-      qualification,
       joining_date,
       shift,
     } = req.body;
@@ -392,7 +391,6 @@ const updateUser = async (req, res) => {
       dob,
       photo_url,
       designation,
-      qualification,
       joining_date,
       shift,
     } = req.body;

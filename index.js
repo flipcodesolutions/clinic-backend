@@ -8,6 +8,7 @@ const { syncDatabase } = require('./models');
 
 const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin');
+const clinicRoutes = require('./routes/clinic');
 const doctorRoutes = require('./routes/doctor');
 const patientRoutes = require('./routes/patient');
 const receptionistRoutes = require('./routes/receptionist');
@@ -33,6 +34,7 @@ app.get('/api-docs.json', (req, res) => res.json(swaggerSpec));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/clinic', clinicRoutes);
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/receptionist', receptionistRoutes);

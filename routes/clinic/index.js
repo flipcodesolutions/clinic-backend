@@ -2,22 +2,24 @@ const express = require("express");
 const { authenticate } = require("../../middleware/auth.middleware");
 const { authorize } = require("../../middleware/authorize.middleware");
 
-const cityRoutes = require("./city.routes");
-const clinicRoutes = require("./clinic.routes");
+const doctorRoutes = require("./doctor.routes");
+const staffRoutes = require("./staff.routes");
 const departmentRoutes = require("./department.routes");
 const serviceRoutes = require("./service.routes");
-const userRoutes = require("./user.routes");
+const galleryRoutes = require("./gallery.routes");
+const settingRoutes = require("./setting.routes");
 const { getClinicDashboard } = require("../../controllers/clinic/dashboard.controller");
 
 const router = express.Router();
 
-router.use(authenticate, authorize("super_admin"));
+router.use(authenticate, authorize("clinic_admin", "super_admin"));
 
 router.get("/dashboard", getClinicDashboard);
-router.use("/cities", cityRoutes);
-router.use("/clinics", clinicRoutes);
+router.use("/doctors", doctorRoutes);
+router.use("/staff", staffRoutes);
 router.use("/departments", departmentRoutes);
 router.use("/services", serviceRoutes);
-router.use("/users", userRoutes);
+router.use("/gallery", galleryRoutes);
+router.use("/settings", settingRoutes);
 
 module.exports = router;

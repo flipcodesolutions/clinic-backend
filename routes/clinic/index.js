@@ -10,6 +10,8 @@ const galleryRoutes = require("./gallery.routes");
 const settingRoutes = require("./setting.routes");
 const { getClinicDashboard } = require("../../controllers/clinic/dashboard.controller");
 const { listClinics, getCurrentClinicProfile, updateCurrentClinicProfile } = require("../../controllers/admin/clinic.controller");
+const { listServices } = require("../../controllers/admin/service.controller");
+const { listDepartments } = require("../../controllers/admin/department.controller");
 
 const router = express.Router();
 
@@ -19,6 +21,11 @@ router.get("/dashboard", getClinicDashboard);
 router.get("/clinics", listClinics);
 router.get("/profile", getCurrentClinicProfile);
 router.put("/profile", updateCurrentClinicProfile);
+
+// Read-only master lists for Clinic Admin (assign modal)
+router.get("/master-services", listServices);
+router.get("/master-departments", listDepartments);
+
 router.use("/doctors", doctorRoutes);
 router.use("/staff", staffRoutes);
 router.use("/departments", departmentRoutes);

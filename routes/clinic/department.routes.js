@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get("/", controller.listClinicDepartments);
 router.post("/", controller.assignDepartment);
+router.put("/:id/status", controller.updateDepartmentStatus);
 router.delete("/:id", controller.removeDepartment);
 
 module.exports = router;

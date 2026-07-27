@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { ClinicDepartment, Department, Clinic, User, DoctorProfile, ClinicUser } = require("../../models");
+const { ClinicDepartment, Department, Clinic, ClinicUser } = require("../../models");
 
 const getClinicId = async (req) => {
   if (req?.user?.id) {
@@ -41,22 +41,10 @@ const listClinicDepartments = async (req, res) => {
       order: [["id", "DESC"]],
     });
 
-    const data = await Promise.all(
-      clinicDepts.map(async (cd) => {
+    const filteredData = clinicDepts
+      .map((cd) => {
         const dept = cd.department;
         if (!dept) return null;
-
-        const docCount = await User.count({
-          where: { status: "active" },
-          include: [
-            {
-              model: DoctorProfile,
-              as: "doctorProfile",
-              where: { specialization: dept.name },
-              required: true,
-            },
-          ],
-        }).catch(() => 0);
 
         return {
           id: dept.id,
@@ -64,12 +52,9 @@ const listClinicDepartments = async (req, res) => {
           name: dept.name,
           description: dept.description,
           status: dept.status || "active",
-          doctor_count: docCount,
         };
       })
-    );
-
-    const filteredData = data.filter(Boolean);
+      .filter(Boolean);
 
     return res.json({
       success: true,
@@ -87,47 +72,49 @@ const listClinicDepartments = async (req, res) => {
 const assignDepartment = async (req, res) => {
   try {
     const clinicId = await getClinicId(req);
-    const { department_id, name, description } = req.body;
+    const { department_id, department_ids, name, description } = req.body;
 
-    let targetDeptId = department_id;
-
-    if (!targetDeptId && name) {
+    let targetIds = [];
+    if (Array.isArray(department_ids) && department_ids.length > 0) {
+      targetIds = department_ids.map((id) => parseInt(id)).filter(Boolean);
+    } else if (department_id) {
+      targetIds = [parseInt(department_id)];
+    } else if (name) {
       const [dept] = await Department.findOrCreate({
         where: { name },
         defaults: { name, description: description || "Specialty Department" },
       });
-      targetDeptId = dept.id;
+      targetIds = [dept.id];
     }
 
-    if (!targetDeptId) {
-      return res.status(400).json({ success: false, message: "Department ID or Name is required" });
+    if (targetIds.length === 0) {
+      return res.status(400).json({ success: false, message: "Department ID(s) or Name is required" });
     }
 
-    const existing = await ClinicDepartment.findOne({
-      where: { clinic_id: clinicId, department_id: targetDeptId },
-    });
+    let assignedCount = 0;
+    for (const targetDeptId of targetIds) {
+      const existing = await ClinicDepartment.findOne({
+        where: { clinic_id: clinicId, department_id: targetDeptId },
+        paranoid: false,
+      });
 
-    if (existing) {
-      return res.status(400).json({ success: false, message: "Department already assigned to clinic" });
+      if (existing) {
+        if (existing.deleted_at || existing.deletedAt || existing.getDataValue("deleted_at") || existing.getDataValue("deletedAt")) {
+          await existing.restore();
+          assignedCount++;
+        }
+      } else {
+        await ClinicDepartment.create({
+          clinic_id: clinicId,
+          department_id: targetDeptId,
+        });
+        assignedCount++;
+      }
     }
-
-    await ClinicDepartment.create({
-      clinic_id: clinicId,
-      department_id: targetDeptId,
-    });
-
-    const deptObj = await Department.findByPk(targetDeptId);
 
     return res.status(201).json({
       success: true,
-      data: {
-        id: deptObj.id,
-        name: deptObj.name,
-        description: deptObj.description,
-        doctor_count: 0,
-        status: "Active",
-      },
-      message: "Department assigned to clinic successfully",
+      message: `${assignedCount || targetIds.length} department(s) assigned to clinic successfully`,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -138,12 +125,45 @@ const removeDepartment = async (req, res) => {
   try {
     const clinicId = await getClinicId(req);
     const deptId = req.params.id;
+    const { ids } = req.body || {};
 
-    await ClinicDepartment.destroy({
-      where: { clinic_id: clinicId, department_id: deptId },
+    let targetIds = [];
+    if (Array.isArray(ids) && ids.length > 0) {
+      targetIds = ids.map((i) => parseInt(i)).filter(Boolean);
+    } else if (deptId && deptId !== "bulk") {
+      targetIds = [parseInt(deptId)];
+    }
+
+    if (targetIds.length > 0) {
+      await ClinicDepartment.destroy({
+        where: { clinic_id: clinicId, department_id: targetIds },
+      });
+    }
+
+    return res.json({ success: true, message: "Department(s) removed from clinic" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updateDepartmentStatus = async (req, res) => {
+  try {
+    const deptId = req.params.id;
+    const { status } = req.body;
+
+    const dept = await Department.findByPk(deptId);
+    if (!dept) {
+      return res.status(404).json({ success: false, message: "Department not found" });
+    }
+
+    const newStatus = status || (dept.status === "active" ? "inactive" : "active");
+    await dept.update({ status: newStatus });
+
+    return res.json({
+      success: true,
+      message: `Department status updated to ${newStatus}`,
+      status: newStatus,
     });
-
-    return res.json({ success: true, message: "Department removed from clinic" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -153,4 +173,5 @@ module.exports = {
   listClinicDepartments,
   assignDepartment,
   removeDepartment,
+  updateDepartmentStatus,
 };

@@ -1,11 +1,46 @@
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
-const { User, Clinic, ClinicUser, DoctorProfile, StaffProfile, sequelize } = require("../../models");
+const { User, Clinic, ClinicUser, DoctorProfile, DoctorDepartment, DoctorExperience, DoctorAchievement, DoctorSchedule, Department, StaffProfile, sequelize } = require("../../models");
 const { deleteOldFile } = require("../../utils/file.utils");
+
+function unwrapLanguages(val) {
+  if (!val) return '';
+  if (Array.isArray(val)) {
+    const items = val.flatMap((item) => unwrapLanguages(item));
+    return items.filter(Boolean).join(', ');
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{') || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return unwrapLanguages(parsed);
+      } catch (e) {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+  return String(val);
+}
+
+function cleanLanguagesArray(val) {
+  if (!val) return null;
+  const unwrappedStr = unwrapLanguages(val);
+  if (!unwrappedStr || unwrappedStr.trim() === '') return null;
+  const list = unwrappedStr
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return list.length > 0 ? list : null;
+}
 
 function publicUser(user) {
   const data = user.toJSON();
   delete data.password;
+  if (data.doctorProfile && data.doctorProfile.languages) {
+    data.doctorProfile.languages = cleanLanguagesArray(data.doctorProfile.languages);
+  }
   return data;
 }
 
@@ -53,6 +88,26 @@ const listUsers = async (req, res) => {
         {
           model: DoctorProfile,
           as: "doctorProfile",
+          include: [
+            {
+              model: Department,
+              as: "departments",
+              attributes: ["id", "name"],
+              through: { attributes: [] },
+            },
+            {
+              model: DoctorExperience,
+              as: "experiences",
+            },
+            {
+              model: DoctorAchievement,
+              as: "achievements",
+            },
+            {
+              model: DoctorSchedule,
+              as: "schedules",
+            },
+          ],
         },
         {
           model: StaffProfile,
@@ -103,6 +158,26 @@ const getUserById = async (req, res) => {
         {
           model: DoctorProfile,
           as: "doctorProfile",
+          include: [
+            {
+              model: Department,
+              as: "departments",
+              attributes: ["id", "name"],
+              through: { attributes: [] },
+            },
+            {
+              model: DoctorExperience,
+              as: "experiences",
+            },
+            {
+              model: DoctorAchievement,
+              as: "achievements",
+            },
+            {
+              model: DoctorSchedule,
+              as: "schedules",
+            },
+          ],
         },
         {
           model: StaffProfile,
@@ -130,6 +205,8 @@ const createUser = async (req, res) => {
       roles,
       status,
       clinic_id,
+      department_id,
+      experiences,
       // DoctorProfile fields
       registration_no,
       qualification,
@@ -143,6 +220,8 @@ const createUser = async (req, res) => {
       photo_url,
       // StaffProfile fields
       designation,
+      qualification,
+      joining_date,
       shift,
     } = req.body;
 
@@ -196,7 +275,7 @@ const createUser = async (req, res) => {
 
     // Handle DoctorProfile if role includes doctor or profile details passed
     if (userRoles.includes("doctor") || specialization || registration_no || qualification) {
-      await DoctorProfile.create({
+      const doctorProfile = await DoctorProfile.create({
         user_id: user.id,
         registration_no: registration_no || null,
         qualification: qualification || null,
@@ -204,20 +283,44 @@ const createUser = async (req, res) => {
         experience_years: parseInt(experience_years) || 0,
         consultation_fee: parseFloat(consultation_fee) || 0,
         bio: bio || null,
-        languages: languages ? (typeof languages === "string" ? languages.split(",").map(s => s.trim()) : languages) : null,
-        gender: gender || null,
-        dob: dob || null,
+        languages: cleanLanguagesArray(languages),
+        gender: (gender && String(gender).trim() !== '') ? gender.toLowerCase() : null,
+        dob: (dob && String(dob).trim() !== '') ? dob : null,
         profile_image: photo_url || null,
       });
+
+      if (department_id) {
+        await DoctorDepartment.create({
+          doctor_id: doctorProfile.id,
+          department_id: parseInt(department_id),
+        });
+      }
+
+      if (Array.isArray(experiences) && experiences.length > 0) {
+        for (const exp of experiences) {
+          if (exp.hospital_name || exp.hospital) {
+            await DoctorExperience.create({
+              doctor_id: doctorProfile.id,
+              hospital_name: exp.hospital_name || exp.hospital,
+              designation: exp.designation || null,
+              start_date: (exp.start_date || exp.startDate) && String(exp.start_date || exp.startDate).trim() !== '' ? (exp.start_date || exp.startDate) : null,
+              end_date: (exp.end_date || exp.endDate) && String(exp.end_date || exp.endDate).trim() !== '' ? (exp.end_date || exp.endDate) : null,
+              description: exp.description || null,
+            });
+          }
+        }
+      }
     }
 
-    // Handle StaffProfile if designation or shift passed or staff roles
+    // Handle StaffProfile if designation, qualification, joining_date or shift passed or staff roles
     const isStaffRole = userRoles.some(r => ["staff", "receptionist", "nurse", "caretaker"].includes(r));
-    if (isStaffRole || designation || shift) {
+    if (isStaffRole || designation || qualification || joining_date || shift) {
       const validShift = ["morning", "evening", "night"].includes(shift?.toLowerCase()) ? shift.toLowerCase() : null;
       await StaffProfile.create({
         user_id: user.id,
         designation: designation || (userRoles[0] ? userRoles[0].charAt(0).toUpperCase() + userRoles[0].slice(1) : "Staff"),
+        qualification: qualification || null,
+        joining_date: (joining_date && String(joining_date).trim() !== '') ? joining_date : null,
         shift: validShift,
       });
     }
@@ -225,13 +328,34 @@ const createUser = async (req, res) => {
     const userWithProfile = await User.findByPk(user.id, {
       attributes: { exclude: ["password"] },
       include: [
-        { model: DoctorProfile, as: "doctorProfile" },
+        {
+          model: DoctorProfile,
+          as: "doctorProfile",
+          include: [
+            {
+              model: Department,
+              as: "departments",
+              attributes: ["id", "name"],
+              through: { attributes: [] },
+            },
+            {
+              model: DoctorExperience,
+              as: "experiences",
+            },
+          ],
+        },
         { model: StaffProfile, as: "staffProfile" },
       ],
     });
 
     return res.status(201).json({ success: true, data: publicUser(userWithProfile) });
   } catch (error) {
+    if (error.name === "SequelizeValidationError" || error.name === "SequelizeUniqueConstraintError") {
+      const msg = error.errors && error.errors.length > 0
+        ? error.errors.map(e => e.message).join(", ")
+        : error.message;
+      return res.status(400).json({ success: false, message: msg || "Validation error" });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -252,6 +376,10 @@ const updateUser = async (req, res) => {
       roles,
       status,
       clinic_id,
+      department_id,
+      experiences,
+      achievements,
+      schedules,
       // DoctorProfile fields
       registration_no,
       qualification,
@@ -264,6 +392,8 @@ const updateUser = async (req, res) => {
       dob,
       photo_url,
       designation,
+      qualification,
+      joining_date,
       shift,
     } = req.body;
 
@@ -306,9 +436,10 @@ const updateUser = async (req, res) => {
 
     if (clinic_id !== undefined) {
       if (clinic_id) {
-        const existingCu = await ClinicUser.findOne({ where: { user_id: user.id } });
+        const existingCu = await ClinicUser.findOne({ where: { user_id: user.id }, paranoid: false });
         if (existingCu) {
-          await existingCu.update({ clinic_id: parseInt(clinic_id) });
+          await existingCu.restore();
+          await existingCu.update({ clinic_id: parseInt(clinic_id), status: "active" });
         } else {
           await ClinicUser.create({
             clinic_id: parseInt(clinic_id),
@@ -317,24 +448,24 @@ const updateUser = async (req, res) => {
           });
         }
       } else {
-        await ClinicUser.destroy({ where: { user_id: user.id } });
+        await ClinicUser.destroy({ where: { user_id: user.id }, force: true });
       }
     }
 
     // Update or Create DoctorProfile
     const profileData = {};
-    if (registration_no !== undefined) profileData.registration_no = registration_no;
-    if (qualification !== undefined) profileData.qualification = qualification;
-    if (specialization !== undefined) profileData.specialization = specialization;
+    if (registration_no !== undefined) profileData.registration_no = registration_no || null;
+    if (qualification !== undefined) profileData.qualification = qualification || null;
+    if (specialization !== undefined) profileData.specialization = specialization || null;
     if (experience_years !== undefined) profileData.experience_years = parseInt(experience_years) || 0;
     if (consultation_fee !== undefined) profileData.consultation_fee = parseFloat(consultation_fee) || 0;
-    if (bio !== undefined) profileData.bio = bio;
-    if (languages !== undefined) profileData.languages = typeof languages === "string" ? languages.split(",").map(s => s.trim()) : languages;
-    if (gender !== undefined) profileData.gender = gender;
-    if (dob !== undefined) profileData.dob = dob;
-    if (photo_url !== undefined) profileData.profile_image = photo_url;
+    if (bio !== undefined) profileData.bio = bio || null;
+    if (languages !== undefined) profileData.languages = cleanLanguagesArray(languages);
+    if (gender !== undefined) profileData.gender = (gender && String(gender).trim() !== '') ? gender.toLowerCase() : null;
+    if (dob !== undefined) profileData.dob = (dob && String(dob).trim() !== '') ? dob : null;
+    if (photo_url !== undefined) profileData.profile_image = photo_url || null;
 
-    if (Object.keys(profileData).length > 0) {
+    if (Object.keys(profileData).length > 0 || department_id !== undefined || experiences !== undefined || achievements !== undefined || schedules !== undefined) {
       const existingProfile = await DoctorProfile.findOne({ where: { user_id: user.id } });
       if (photo_url && existingProfile && existingProfile.profile_image && existingProfile.profile_image !== photo_url) {
         deleteOldFile(existingProfile.profile_image);
@@ -344,11 +475,83 @@ const updateUser = async (req, res) => {
         defaults: { user_id: user.id, ...profileData },
       });
       await doctorProfile.update(profileData);
+
+      if (department_id !== undefined) {
+        await DoctorDepartment.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+        if (department_id) {
+          const existingDd = await DoctorDepartment.findOne({
+            where: { doctor_id: doctorProfile.id, department_id: parseInt(department_id) },
+            paranoid: false,
+          });
+          if (existingDd) {
+            await existingDd.restore();
+          } else {
+            await DoctorDepartment.create({
+              doctor_id: doctorProfile.id,
+              department_id: parseInt(department_id),
+            });
+          }
+        }
+      }
+
+      if (Array.isArray(experiences)) {
+        await DoctorExperience.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+        for (const exp of experiences) {
+          if (exp.hospital_name || exp.hospital) {
+            await DoctorExperience.create({
+              doctor_id: doctorProfile.id,
+              hospital_name: exp.hospital_name || exp.hospital,
+              designation: exp.designation || null,
+              start_date: (exp.start_date || exp.startDate) && String(exp.start_date || exp.startDate).trim() !== '' ? (exp.start_date || exp.startDate) : null,
+              end_date: (exp.end_date || exp.endDate) && String(exp.end_date || exp.endDate).trim() !== '' ? (exp.end_date || exp.endDate) : null,
+              description: exp.description || null,
+            });
+          }
+        }
+      }
+
+      if (Array.isArray(achievements)) {
+        await DoctorAchievement.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+        for (const ach of achievements) {
+          if (ach.title && String(ach.title).trim() !== '') {
+            await DoctorAchievement.create({
+              doctor_id: doctorProfile.id,
+              title: String(ach.title).trim(),
+              description: ach.description || ach.organization || null,
+              year: ach.year ? parseInt(ach.year) : null,
+            });
+          }
+        }
+      }
+
+      if (Array.isArray(schedules)) {
+        await DoctorSchedule.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+        const assignedClinic = clinic_id || (await ClinicUser.findOne({ where: { user_id: user.id } }))?.clinic_id || 1;
+        for (const sc of schedules) {
+          if (sc.day || sc.day_of_week) {
+            const rawDay = String(sc.day || sc.day_of_week).toLowerCase();
+            const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+            const day_of_week = validDays.includes(rawDay) ? rawDay : "monday";
+            await DoctorSchedule.create({
+              doctor_id: doctorProfile.id,
+              clinic_id: parseInt(assignedClinic),
+              day_of_week,
+              start_time: sc.start_time || "09:00:00",
+              end_time: sc.end_time || "17:00:00",
+              slot_duration: sc.slot_duration ? parseInt(sc.slot_duration) : 15,
+              maximum_booking: sc.max_patients || sc.maximum_booking ? parseInt(sc.max_patients || sc.maximum_booking) : 10,
+              is_available: sc.is_available !== undefined ? Boolean(sc.is_available) : true,
+            });
+          }
+        }
+      }
     }
 
     // Update or Create StaffProfile
     const staffData = {};
-    if (designation !== undefined) staffData.designation = designation;
+    if (designation !== undefined) staffData.designation = designation || null;
+    if (qualification !== undefined) staffData.qualification = qualification || null;
+    if (joining_date !== undefined) staffData.joining_date = (joining_date && String(joining_date).trim() !== '') ? joining_date : null;
     if (shift !== undefined) {
       staffData.shift = ["morning", "evening", "night"].includes(shift?.toLowerCase()) ? shift.toLowerCase() : null;
     }
@@ -363,13 +566,42 @@ const updateUser = async (req, res) => {
     const updatedUser = await User.findByPk(user.id, {
       attributes: { exclude: ["password"] },
       include: [
-        { model: DoctorProfile, as: "doctorProfile" },
+        {
+          model: DoctorProfile,
+          as: "doctorProfile",
+          include: [
+            {
+              model: Department,
+              as: "departments",
+              attributes: ["id", "name"],
+              through: { attributes: [] },
+            },
+            {
+              model: DoctorExperience,
+              as: "experiences",
+            },
+            {
+              model: DoctorAchievement,
+              as: "achievements",
+            },
+            {
+              model: DoctorSchedule,
+              as: "schedules",
+            },
+          ],
+        },
         { model: StaffProfile, as: "staffProfile" },
       ],
     });
 
     return res.json({ success: true, data: publicUser(updatedUser) });
   } catch (error) {
+    if (error.name === "SequelizeValidationError" || error.name === "SequelizeUniqueConstraintError") {
+      const msg = error.errors && error.errors.length > 0
+        ? error.errors.map(e => e.message).join(", ")
+        : error.message;
+      return res.status(400).json({ success: false, message: msg || "Validation error" });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };

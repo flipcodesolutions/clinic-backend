@@ -76,6 +76,12 @@ User.hasMany(ClinicUser, { foreignKey: "user_id", as: "clinicUsers" });
 Clinic.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
 // Clinic - Department / Service
+ClinicDepartment.belongsTo(Department, { foreignKey: "department_id", as: "department" });
+ClinicDepartment.belongsTo(Clinic, { foreignKey: "clinic_id", as: "clinic" });
+
+ClinicService.belongsTo(Service, { foreignKey: "service_id", as: "service" });
+ClinicService.belongsTo(Clinic, { foreignKey: "clinic_id", as: "clinic" });
+
 Clinic.belongsToMany(Department, {
   through: ClinicDepartment,
   foreignKey: "clinic_id",

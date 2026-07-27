@@ -1,14 +1,18 @@
 const { Op } = require("sequelize");
-const { ClinicDepartment, Department, Clinic, User, DoctorProfile } = require("../../models");
+const { ClinicDepartment, Department, Clinic, User, DoctorProfile, ClinicUser } = require("../../models");
 
-const getClinicId = async () => {
+const getClinicId = async (req) => {
+  if (req?.user?.id) {
+    const cu = await ClinicUser.findOne({ where: { user_id: req.user.id } });
+    if (cu) return cu.clinic_id;
+  }
   const clinic = await Clinic.findOne({ attributes: ["id"], order: [["id", "ASC"]] });
   return clinic ? clinic.id : 1;
 };
 
 const listClinicDepartments = async (req, res) => {
   try {
-    const clinicId = await getClinicId();
+    const clinicId = await getClinicId(req);
     const { search, status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -29,6 +33,7 @@ const listClinicDepartments = async (req, res) => {
           model: Department,
           as: "department",
           where: Object.keys(deptWhere).length > 0 ? deptWhere : undefined,
+          required: Object.keys(deptWhere).length > 0,
         },
       ],
       limit,
@@ -81,7 +86,7 @@ const listClinicDepartments = async (req, res) => {
 
 const assignDepartment = async (req, res) => {
   try {
-    const clinicId = await getClinicId();
+    const clinicId = await getClinicId(req);
     const { department_id, name, description } = req.body;
 
     let targetDeptId = department_id;
@@ -131,7 +136,7 @@ const assignDepartment = async (req, res) => {
 
 const removeDepartment = async (req, res) => {
   try {
-    const clinicId = await getClinicId();
+    const clinicId = await getClinicId(req);
     const deptId = req.params.id;
 
     await ClinicDepartment.destroy({

@@ -76,11 +76,11 @@ const updateCity = async (req, res) => {
 
 const deleteCity = async (req, res) => {
   try {
-    const city = await City.findByPk(req.params.id);
+    const city = await City.findByPk(req.params.id, { paranoid: false });
     if (!city) {
       return res.status(404).json({ success: false, message: "City not found" });
     }
-    await city.destroy();
+    await city.destroy({ force: true });
     return res.json({ success: true, message: "City deleted" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

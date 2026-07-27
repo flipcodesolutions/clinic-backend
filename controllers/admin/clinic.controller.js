@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Clinic } = require("../../models");
+const { Clinic, ClinicUser } = require("../../models");
 const { deleteOldFile } = require("../../utils/file.utils");
 
 const listClinics = async (req, res) => {
@@ -9,6 +9,18 @@ const listClinics = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     const where = {};
+
+    // For Clinic Admin (non Super Admin), restrict to their assigned clinics via ClinicUser
+    const userRole = req.user?.role || (Array.isArray(req.user?.roles) ? req.user.roles[0] : '');
+    const isSuperAdmin = userRole === 'super_admin' || req.user?.roles?.includes('super_admin');
+
+    if (!isSuperAdmin && req.user?.id) {
+      const cuList = await ClinicUser.findAll({ where: { user_id: req.user.id } });
+      const assignedClinicIds = cuList.map((cu) => cu.clinic_id).filter(Boolean);
+      if (assignedClinicIds.length > 0) {
+        where.id = { [Op.in]: assignedClinicIds };
+      }
+    }
 
     if (search) {
       where.name = { [Op.like]: `%${search}%` };

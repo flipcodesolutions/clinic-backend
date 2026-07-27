@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const ALLOWED_CATEGORIES = ['gallery', 'doctors', 'clinics', 'users', 'documents', 'general'];
+const ALLOWED_CATEGORIES = ['gallery', 'doctors', 'clinics', 'users', 'documents', 'staff', 'general'];
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

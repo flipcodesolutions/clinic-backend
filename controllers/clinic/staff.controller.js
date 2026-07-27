@@ -1,53 +1,103 @@
 const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
-const { User, ClinicUser, StaffProfile, sequelize } = require("../../models");
+const { User, StaffProfile, Clinic, ClinicUser, sequelize } = require("../../models");
 const { deleteOldFile } = require("../../utils/file.utils");
 
-function publicStaff(user) {
-  const data = user.toJSON();
-  delete data.password;
-  return data;
-}
+const getClinicId = async (req) => {
+  if (req?.user?.id) {
+    const cu = await ClinicUser.findOne({ where: { user_id: req.user.id } });
+    if (cu?.clinic_id) return cu.clinic_id;
+  }
+  const clinic = await Clinic.findOne({ attributes: ["id"], order: [["id", "ASC"]] });
+  return clinic ? clinic.id : 1;
+};
+
+const formatStaffResponse = (user) => {
+  const staff = user.staffProfile ? user.staffProfile.toJSON() : {};
+  const clinicUsers = user.clinicUsers || [];
+  const clinics = clinicUsers.map((cu) => cu.clinic ? cu.clinic.toJSON() : null).filter(Boolean);
+
+  return {
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    full_name: `${user.first_name} ${user.last_name}`.trim(),
+    email: user.email,
+    phone: user.phone,
+    roles: user.roles || ["staff"],
+    designation: staff.designation || "",
+    qualification: staff.qualification || "",
+    joining_date: staff.joining_date || null,
+    salary: staff.salary || null,
+    address: staff.address || "",
+    city: staff.city || "",
+    state: staff.state || "",
+    postal_code: staff.postal_code || "",
+    emergency_contact: staff.emergency_contact || "",
+    profile_image: user.profile_image || null,
+    photo_url: user.profile_image || null,
+    status: user.status,
+    createdAt: user.createdAt,
+    clinics,
+  };
+};
 
 const listStaff = async (req, res) => {
   try {
-    const { search, status } = req.query;
+    const clinicId = await getClinicId(req);
+    const { search, designation, status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const staffRoles = ["receptionist", "nurse", "staff", "caretaker"];
-    const roleConditions = staffRoles.map(r => 
-      sequelize.where(sequelize.cast(sequelize.col("User.roles"), "CHAR"), "LIKE", `%${r}%`)
-    );
-
-    const where = {
-      [Op.or]: roleConditions,
+    const userWhere = {
+      [Op.and]: [
+        sequelize.where(
+          sequelize.cast(sequelize.col("User.roles"), "CHAR"),
+          "LIKE",
+          "%staff%"
+        ),
+      ],
     };
 
-    if (search) {
-      where[Op.and] = [
-        {
-          [Op.or]: [
-            { first_name: { [Op.like]: `%${search}%` } },
-            { last_name: { [Op.like]: `%${search}%` } },
-            { email: { [Op.like]: `%${search}%` } },
-            { phone: { [Op.like]: `%${search}%` } },
-          ],
-        },
-      ];
-    }
     if (status) {
-      where.status = status;
+      userWhere.status = status;
     }
 
-    const { count, rows: staffMembers } = await User.findAndCountAll({
-      where,
-      attributes: { exclude: ["password"] },
-      include: [{ model: StaffProfile, as: "staffProfile" }],
+    if (search) {
+      userWhere[Op.or] = [
+        { first_name: { [Op.like]: `%${search}%` } },
+        { last_name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { phone: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const staffWhere = {};
+    if (designation) {
+      staffWhere.designation = designation;
+    }
+
+    const { count, rows: users } = await User.findAndCountAll({
+      where: userWhere,
+      include: [
+        {
+          model: ClinicUser,
+          as: "clinicUsers",
+          where: { clinic_id: clinicId },
+          include: [{ model: Clinic, as: "clinic" }],
+        },
+        {
+          model: StaffProfile,
+          as: "staffProfile",
+          where: Object.keys(staffWhere).length ? staffWhere : undefined,
+          required: false,
+        },
+      ],
+      order: [["id", "DESC"]],
       limit,
       offset,
-      order: [["id", "DESC"]],
+      distinct: true,
     });
 
     return res.json({
@@ -56,7 +106,7 @@ const listStaff = async (req, res) => {
       currentPage: page,
       totalPages: Math.ceil(count / limit) || 1,
       limit,
-      data: staffMembers.map(publicStaff),
+      data: users.map(formatStaffResponse),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -65,14 +115,22 @@ const listStaff = async (req, res) => {
 
 const getStaffById = async (req, res) => {
   try {
-    const staff = await User.findByPk(req.params.id, {
-      attributes: { exclude: ["password"] },
-      include: [{ model: StaffProfile, as: "staffProfile" }],
+    const user = await User.findByPk(req.params.id, {
+      include: [
+        { model: StaffProfile, as: "staffProfile" },
+        {
+          model: ClinicUser,
+          as: "clinicUsers",
+          include: [{ model: Clinic, as: "clinic" }],
+        },
+      ],
     });
-    if (!staff) {
+
+    if (!user) {
       return res.status(404).json({ success: false, message: "Staff member not found" });
     }
-    return res.json({ success: true, data: publicStaff(staff) });
+
+    return res.json({ success: true, data: formatStaffResponse(user) });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -80,80 +138,83 @@ const getStaffById = async (req, res) => {
 
 const createStaff = async (req, res) => {
   try {
+    const clinicId = req.body.clinic_id || (await getClinicId(req));
     const {
       first_name,
       last_name,
       email,
       phone,
       password,
-      roles,
-      status,
-      clinic_id,
       designation,
       qualification,
       joining_date,
-      shift,
+      salary,
+      address,
+      city,
+      state,
+      postal_code,
+      emergency_contact,
+      profile_image,
       photo_url,
     } = req.body;
 
-    if (!first_name || !email || !phone || !password) {
-      return res.status(400).json({ success: false, message: "First name, email, phone, and password are required" });
+    const imgUrl = profile_image || photo_url || null;
+
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "User with this email already exists" });
     }
 
-    const cleanPhone = String(phone).replace(/\D/g, "");
-    if (cleanPhone.length !== 10) {
-      return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits" });
-    }
-
-    const existingEmail = await User.findOne({ where: { email } });
-    if (existingEmail) {
-      return res.status(400).json({ success: false, message: "Email is already registered" });
-    }
-
-    const existingPhone = await User.findOne({ where: { phone } });
-    if (existingPhone) {
-      return res.status(400).json({ success: false, message: "Phone number is already registered" });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : ["receptionist"];
+    const rawPassword = password || "Password@123";
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     const user = await User.create({
       first_name,
-      last_name: last_name || null,
+      last_name,
       email,
       phone,
-      password: passwordHash,
-      roles: userRoles,
-      status: status || "active",
-      profile_image: photo_url || null,
-      email_verified_at: new Date(),
-      phone_verified_at: new Date(),
+      password: hashedPassword,
+      roles: ["receptionist", "staff"],
+      profile_image: imgUrl,
+      status: req.body.status || "active",
     });
 
-    if (clinic_id) {
-      await ClinicUser.create({
-        clinic_id: parseInt(clinic_id),
-        user_id: user.id,
-        status: "active",
-      });
-    }
-
-    const validShift = ["morning", "evening", "night"].includes(shift?.toLowerCase()) ? shift.toLowerCase() : null;
     await StaffProfile.create({
       user_id: user.id,
-      designation: designation || (userRoles[0] ? userRoles[0].charAt(0).toUpperCase() + userRoles[0].slice(1) : "Staff"),
-      qualification: qualification || null,
-      joining_date: (joining_date && String(joining_date).trim() !== '') ? joining_date : null,
-      shift: validShift,
+      designation,
+      qualification,
+      joining_date,
+      salary,
+      address,
+      city,
+      state,
+      postal_code,
+      emergency_contact,
     });
 
-    const staffWithProfile = await User.findByPk(user.id, {
-      attributes: { exclude: ["password"] },
-      include: [{ model: StaffProfile, as: "staffProfile" }],
+    await ClinicUser.create({
+      user_id: user.id,
+      clinic_id: clinicId,
+      designation,
+      joining_date,
     });
 
-    return res.status(201).json({ success: true, data: publicStaff(staffWithProfile) });
+    const fullUser = await User.findByPk(user.id, {
+      include: [
+        { model: StaffProfile, as: "staffProfile" },
+        {
+          model: ClinicUser,
+          as: "clinicUsers",
+          include: [{ model: Clinic, as: "clinic" }],
+        },
+      ],
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: formatStaffResponse(fullUser),
+      message: "Staff member created successfully",
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -161,7 +222,10 @@ const createStaff = async (req, res) => {
 
 const updateStaff = async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const user = await User.findByPk(req.params.id, {
+      include: [{ model: StaffProfile, as: "staffProfile" }],
+    });
+
     if (!user) {
       return res.status(404).json({ success: false, message: "Staff member not found" });
     }
@@ -172,34 +236,25 @@ const updateStaff = async (req, res) => {
       email,
       phone,
       password,
-      roles,
       status,
-      clinic_id,
       designation,
       qualification,
       joining_date,
-      shift,
+      salary,
+      address,
+      city,
+      state,
+      postal_code,
+      emergency_contact,
+      profile_image,
       photo_url,
+      clinic_id,
     } = req.body;
 
-    if (email && email !== user.email) {
-      const existingEmail = await User.findOne({ where: { email } });
-      if (existingEmail) {
-        return res.status(400).json({ success: false, message: "Email is already registered" });
-      }
-    }
+    const imgUrl = profile_image !== undefined ? profile_image : photo_url;
 
-    if (phone) {
-      const cleanPhone = String(phone).replace(/\D/g, "");
-      if (cleanPhone.length !== 10) {
-        return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits" });
-      }
-      if (phone !== user.phone) {
-        const existingPhone = await User.findOne({ where: { phone } });
-        if (existingPhone) {
-          return res.status(400).json({ success: false, message: "Phone number is already registered" });
-        }
-      }
+    if (imgUrl && user.profile_image && user.profile_image !== imgUrl) {
+      deleteOldFile(user.profile_image);
     }
 
     const updateData = {};
@@ -207,55 +262,58 @@ const updateStaff = async (req, res) => {
     if (last_name !== undefined) updateData.last_name = last_name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
-    if (status !== undefined) updateData.status = status;
-    if (roles !== undefined) updateData.roles = Array.isArray(roles) ? roles : [roles];
-    if (password && password.trim().length > 0) {
+    if (password && password.trim() !== "") {
       updateData.password = await bcrypt.hash(password, 10);
     }
-    if (photo_url !== undefined) {
-      if (photo_url && user.profile_image && user.profile_image !== photo_url) {
-        deleteOldFile(user.profile_image);
-      }
-      updateData.profile_image = photo_url || null;
-    }
+    if (status !== undefined) updateData.status = status;
+    if (imgUrl !== undefined) updateData.profile_image = imgUrl;
 
     await user.update(updateData);
 
-    if (clinic_id !== undefined && clinic_id) {
-      const existingCu = await ClinicUser.findOne({ where: { user_id: user.id }, paranoid: false });
-      if (existingCu) {
-        await existingCu.restore();
-        await existingCu.update({ clinic_id: parseInt(clinic_id), status: "active" });
+    let staffProfile = user.staffProfile;
+    const profileData = {
+      designation,
+      qualification,
+      joining_date,
+      salary,
+      address,
+      city,
+      state,
+      postal_code,
+      emergency_contact,
+    };
+
+    if (staffProfile) {
+      await staffProfile.update(profileData);
+    } else {
+      staffProfile = await StaffProfile.create({ user_id: user.id, ...profileData });
+    }
+
+    if (clinic_id) {
+      const cu = await ClinicUser.findOne({ where: { user_id: user.id } });
+      if (cu) {
+        await cu.update({ clinic_id });
       } else {
-        await ClinicUser.create({
-          clinic_id: parseInt(clinic_id),
-          user_id: user.id,
-          status: "active",
-        });
+        await ClinicUser.create({ user_id: user.id, clinic_id });
       }
     }
 
-    const staffData = {};
-    if (designation !== undefined) staffData.designation = designation || null;
-    if (qualification !== undefined) staffData.qualification = qualification || null;
-    if (joining_date !== undefined) staffData.joining_date = (joining_date && String(joining_date).trim() !== '') ? joining_date : null;
-    if (shift !== undefined) {
-      staffData.shift = ["morning", "evening", "night"].includes(shift?.toLowerCase()) ? shift.toLowerCase() : null;
-    }
-    if (Object.keys(staffData).length > 0) {
-      const [staffProfile] = await StaffProfile.findOrCreate({
-        where: { user_id: user.id },
-        defaults: { user_id: user.id, ...staffData },
-      });
-      await staffProfile.update(staffData);
-    }
-
     const updatedUser = await User.findByPk(user.id, {
-      attributes: { exclude: ["password"] },
-      include: [{ model: StaffProfile, as: "staffProfile" }],
+      include: [
+        { model: StaffProfile, as: "staffProfile" },
+        {
+          model: ClinicUser,
+          as: "clinicUsers",
+          include: [{ model: Clinic, as: "clinic" }],
+        },
+      ],
     });
 
-    return res.json({ success: true, data: publicStaff(updatedUser) });
+    return res.json({
+      success: true,
+      data: formatStaffResponse(updatedUser),
+      message: "Staff member updated successfully",
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -263,14 +321,16 @@ const updateStaff = async (req, res) => {
 
 const deleteStaff = async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const user = await User.findByPk(req.params.id, { paranoid: false });
     if (!user) {
       return res.status(404).json({ success: false, message: "Staff member not found" });
     }
     if (user.profile_image) {
       deleteOldFile(user.profile_image);
     }
-    await user.destroy();
+    await ClinicUser.destroy({ where: { user_id: user.id }, force: true });
+    await StaffProfile.destroy({ where: { user_id: user.id }, force: true });
+    await user.destroy({ force: true });
     return res.json({ success: true, message: "Staff member deleted successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

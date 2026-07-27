@@ -390,15 +390,23 @@ const updateDoctor = async (req, res) => {
 
 const deleteDoctor = async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const user = await User.findByPk(req.params.id, { paranoid: false });
     if (!user) {
       return res.status(404).json({ success: false, message: "Doctor not found" });
     }
-    const doctorProfile = await DoctorProfile.findOne({ where: { user_id: user.id } });
-    if (doctorProfile && doctorProfile.profile_image) {
-      deleteOldFile(doctorProfile.profile_image);
+    const doctorProfile = await DoctorProfile.findOne({ where: { user_id: user.id }, paranoid: false });
+    if (doctorProfile) {
+      if (doctorProfile.profile_image) {
+        deleteOldFile(doctorProfile.profile_image);
+      }
+      await DoctorDepartment.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+      await DoctorExperience.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+      await DoctorAchievement.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+      await DoctorSchedule.destroy({ where: { doctor_id: doctorProfile.id }, force: true });
+      await DoctorProfile.destroy({ where: { id: doctorProfile.id }, force: true });
     }
-    await user.destroy();
+    await ClinicUser.destroy({ where: { user_id: user.id }, force: true });
+    await user.destroy({ force: true });
     return res.json({ success: true, message: "Doctor deleted successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

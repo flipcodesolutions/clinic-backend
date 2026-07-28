@@ -20,7 +20,10 @@ const listClinicDepartments = async (req, res) => {
 
     const deptWhere = {};
     if (search) {
-      deptWhere.name = { [Op.like]: `%${search}%` };
+      deptWhere[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+      ];
     }
     if (status) {
       deptWhere.status = status;

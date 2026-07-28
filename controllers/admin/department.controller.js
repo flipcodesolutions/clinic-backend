@@ -10,7 +10,10 @@ const listDepartments = async (req, res) => {
     const where = {};
 
     if (search) {
-      where.name = { [Op.like]: `%${search}%` };
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+      ];
     }
     if (status) {
       where.status = status;

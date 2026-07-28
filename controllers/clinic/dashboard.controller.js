@@ -1,13 +1,32 @@
-const { User, DoctorProfile, StaffProfile, ClinicDepartment, ClinicService, Appointment } = require("../../models");
+const { Op } = require("sequelize");
+const { User, DoctorProfile, StaffProfile, ClinicDepartment, ClinicService, Appointment, ClinicUser, Clinic, sequelize } = require("../../models");
+
+const getClinicId = async (req) => {
+  if (req?.user?.id) {
+    const cu = await ClinicUser.findOne({ where: { user_id: req.user.id } });
+    if (cu?.clinic_id) return cu.clinic_id;
+  }
+  const clinic = await Clinic.findOne({ attributes: ["id"], order: [["id", "ASC"]] });
+  return clinic ? clinic.id : 1;
+};
 
 const getClinicDashboard = async (req, res) => {
   try {
+    const clinicId = await getClinicId(req);
     const today = new Date().toISOString().slice(0, 10);
 
-    // Today's appointments count & list
+    const clinicUserInclude = {
+      model: ClinicUser,
+      as: "clinicUsers",
+      where: { clinic_id: clinicId },
+      attributes: [],
+    };
+
+    // Today's appointments count & list for this clinic
     const appointments = await Appointment.findAll({
       where: {
         appointment_date: today,
+        clinic_id: clinicId,
       },
       include: [
         { model: User, as: "patient", attributes: ["first_name", "last_name"] },
@@ -27,7 +46,7 @@ const getClinicDashboard = async (req, res) => {
       status: app.status || "confirmed",
     }));
 
-    // Active doctors count & preview list
+    // Active doctors count & preview list for this clinic
     const doctorsCount = await User.count({
       where: { status: "active" },
       include: [
@@ -36,7 +55,9 @@ const getClinicDashboard = async (req, res) => {
           as: "doctorProfile",
           required: true,
         },
+        clinicUserInclude,
       ],
+      distinct: true,
     }).catch(() => 0);
 
     const doctorsList = await User.findAll({
@@ -47,6 +68,7 @@ const getClinicDashboard = async (req, res) => {
           as: "doctorProfile",
           required: true,
         },
+        clinicUserInclude,
       ],
       limit: 10,
     }).catch(() => []);
@@ -62,34 +84,40 @@ const getClinicDashboard = async (req, res) => {
       photo_url: doc.doctorProfile?.profile_image || "",
     }));
 
-    // Staff list & total count (roles receptionist, nurse, staff, caretaker)
-    const allActiveUsers = await User.findAll({
-      where: { status: "active" },
+    // Staff list & total count for this clinic
+    const staffRoles = ["receptionist", "nurse", "staff", "caretaker"];
+    const staffWhere = {
+      status: "active",
+      [Op.or]: staffRoles.map((r) =>
+        sequelize.where(
+          sequelize.cast(sequelize.col("User.roles"), "CHAR"),
+          "LIKE",
+          `%${r}%`
+        )
+      ),
+    };
+
+    const staffUsers = await User.findAll({
+      where: staffWhere,
+      include: [clinicUserInclude],
       attributes: ["id", "roles"],
     }).catch(() => []);
 
-    const totalStaffCount = allActiveUsers.filter((u) => {
-      const roles = Array.isArray(u.roles) ? u.roles : [];
-      return roles.some((r) => ["receptionist", "nurse", "staff", "caretaker"].includes(r));
-    }).length;
+    const totalStaffCount = staffUsers.length;
 
     const staffList = await User.findAll({
-      where: { status: "active" },
+      where: staffWhere,
       include: [
         {
           model: StaffProfile,
           as: "staffProfile",
         },
+        clinicUserInclude,
       ],
       limit: 10,
     }).catch(() => []);
 
-    const filteredStaff = staffList.filter((u) => {
-      const roles = Array.isArray(u.roles) ? u.roles : [];
-      return roles.some((r) => ["receptionist", "nurse", "staff", "caretaker"].includes(r));
-    });
-
-    const formattedStaff = filteredStaff.map((st) => ({
+    const formattedStaff = staffList.map((st) => ({
       id: st.id,
       first_name: st.first_name,
       last_name: st.last_name,
@@ -97,13 +125,13 @@ const getClinicDashboard = async (req, res) => {
       phone: st.phone,
       role: Array.isArray(st.roles) ? st.roles[0] : "staff",
       designation: st.staffProfile?.designation || "Staff Member",
-      shift: st.staffProfile?.shift ? st.staffProfile.shift.charAt(0).toUpperCase() + st.staffProfile.shift.slice(1) : "General",
+      shift: st.staffProfile?.shift ? st.staffProfile.shift.charAt(0).toUpperCase() + st.staffProfile.shift.slice(1) : null,
       status: st.status || "active",
     }));
 
-    const departmentsCount = await ClinicDepartment.count().catch(() => 0);
-    const servicesCount = await ClinicService.count().catch(() => 0);
-    const todayAppointmentsCount = await Appointment.count({ where: { appointment_date: today } }).catch(() => formattedAppointments.length);
+    const departmentsCount = await ClinicDepartment.count({ where: { clinic_id: clinicId } }).catch(() => 0);
+    const servicesCount = await ClinicService.count({ where: { clinic_id: clinicId } }).catch(() => 0);
+    const todayAppointmentsCount = await Appointment.count({ where: { appointment_date: today, clinic_id: clinicId } }).catch(() => formattedAppointments.length);
 
     return res.json({
       success: true,

@@ -153,11 +153,13 @@ const options = {
     tags: [
       { name: "Auth", description: "Authentication (public + me)" },
       { name: "Admin", description: "Super admin APIs" },
+      { name: "Clinic", description: "Clinic panel APIs" },
       { name: "Doctor", description: "Doctor APIs" },
       { name: "Patient", description: "Patient APIs" },
       { name: "Receptionist", description: "Receptionist APIs" },
       { name: "Caretaker", description: "Caretaker APIs" },
       { name: "Staff", description: "Staff APIs" },
+      { name: "Upload", description: "File upload APIs" },
     ],
     paths: {
       "/api/auth/register": {
@@ -473,6 +475,490 @@ const options = {
             },
           },
           responses: { 200: { description: "Saved" } },
+        },
+      },
+      "/api/admin/dashboard": {
+        get: {
+          tags: ["Admin"],
+          summary: "Super admin dashboard stats",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+      },
+
+      // Clinic Panel
+      "/api/clinic/dashboard": {
+        get: {
+          tags: ["Clinic"],
+          summary: "Clinic panel dashboard stats",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+      },
+      "/api/clinic/clinics": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List accessible clinics",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+      },
+      "/api/clinic/profile": {
+        get: {
+          tags: ["Clinic"],
+          summary: "Get current clinic profile",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        put: {
+          tags: ["Clinic"],
+          summary: "Update current clinic profile",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Clinic" },
+              },
+            },
+          },
+          responses: { 200: { description: "Updated" } },
+        },
+      },
+      "/api/clinic/master-services": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List master services for clinic assignment",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+      },
+      "/api/clinic/master-departments": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List master departments for clinic assignment",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+      },
+      "/api/clinic/doctors": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List clinic doctors",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        post: {
+          tags: ["Clinic"],
+          summary: "Create doctor account & profile for clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: { 201: { description: "Created" } },
+        },
+      },
+      "/api/clinic/doctors/{id}": {
+        put: {
+          tags: ["Clinic"],
+          summary: "Update doctor profile",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: { 200: { description: "Updated" } },
+        },
+        delete: {
+          tags: ["Clinic"],
+          summary: "Delete doctor profile",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: { 200: { description: "Deleted" } },
+        },
+      },
+      "/api/clinic/staff": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List clinic staff",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        post: {
+          tags: ["Clinic"],
+          summary: "Create staff account & profile",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: { 201: { description: "Created" } },
+        },
+      },
+      "/api/clinic/staff/{id}": {
+        get: {
+          tags: ["Clinic"],
+          summary: "Get staff detail",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: { 200: { description: "OK" } },
+        },
+        put: {
+          tags: ["Clinic"],
+          summary: "Update staff profile",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: { 200: { description: "Updated" } },
+        },
+        delete: {
+          tags: ["Clinic"],
+          summary: "Delete staff profile",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: { 200: { description: "Deleted" } },
+        },
+      },
+      "/api/clinic/departments": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List assigned clinic departments",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        post: {
+          tags: ["Clinic"],
+          summary: "Assign department to clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["department_id"],
+                  properties: {
+                    department_id: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 201: { description: "Assigned" } },
+        },
+      },
+      "/api/clinic/departments/sync": {
+        post: {
+          tags: ["Clinic"],
+          summary: "Sync department IDs list for clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    department_ids: {
+                      type: "array",
+                      items: { type: "integer" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Synced" } },
+        },
+        put: {
+          tags: ["Clinic"],
+          summary: "Sync department IDs list for clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    department_ids: {
+                      type: "array",
+                      items: { type: "integer" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Synced" } },
+        },
+      },
+      "/api/clinic/departments/{id}/status": {
+        put: {
+          tags: ["Clinic"],
+          summary: "Update clinic department status",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status"],
+                  properties: {
+                    status: { type: "string", enum: ["active", "inactive"] },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Updated" } },
+        },
+      },
+      "/api/clinic/departments/{id}": {
+        delete: {
+          tags: ["Clinic"],
+          summary: "Remove department from clinic",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: { 200: { description: "Removed" } },
+        },
+      },
+      "/api/clinic/services": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List assigned clinic services",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        post: {
+          tags: ["Clinic"],
+          summary: "Assign service to clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["service_id"],
+                  properties: {
+                    service_id: { type: "integer" },
+                    price: { type: "number" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 201: { description: "Assigned" } },
+        },
+      },
+      "/api/clinic/services/sync": {
+        post: {
+          tags: ["Clinic"],
+          summary: "Sync service IDs list for clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    service_ids: {
+                      type: "array",
+                      items: { type: "integer" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Synced" } },
+        },
+        put: {
+          tags: ["Clinic"],
+          summary: "Sync service IDs list for clinic",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    service_ids: {
+                      type: "array",
+                      items: { type: "integer" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Synced" } },
+        },
+      },
+      "/api/clinic/services/{id}/status": {
+        put: {
+          tags: ["Clinic"],
+          summary: "Update clinic service status",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["status"],
+                  properties: {
+                    status: { type: "string", enum: ["active", "inactive"] },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Updated" } },
+        },
+      },
+      "/api/clinic/services/{id}": {
+        delete: {
+          tags: ["Clinic"],
+          summary: "Remove service from clinic",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: { 200: { description: "Removed" } },
+        },
+      },
+      "/api/clinic/gallery": {
+        get: {
+          tags: ["Clinic"],
+          summary: "List clinic gallery images",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        post: {
+          tags: ["Clinic"],
+          summary: "Upload/add gallery item",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["image_url"],
+                  properties: {
+                    title: { type: "string" },
+                    image_url: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 201: { description: "Created" } },
+        },
+      },
+      "/api/clinic/gallery/{id}": {
+        put: {
+          tags: ["Clinic"],
+          summary: "Update gallery item",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: { 200: { description: "Updated" } },
+        },
+        delete: {
+          tags: ["Clinic"],
+          summary: "Delete gallery item",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: { 200: { description: "Deleted" } },
+        },
+      },
+      "/api/clinic/settings": {
+        get: {
+          tags: ["Clinic"],
+          summary: "Get clinic settings",
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: "OK" } },
+        },
+        put: {
+          tags: ["Clinic"],
+          summary: "Save/update clinic settings",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: { 200: { description: "Saved" } },
+        },
+      },
+
+      // Upload
+      "/api/upload/{category}": {
+        post: {
+          tags: ["Upload"],
+          summary: "Upload single file",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "category", in: "path", required: true, schema: { type: "string" } },
+          ],
+          requestBody: {
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    file: { type: "string", format: "binary" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Uploaded successfully" } },
+        },
+      },
+      "/api/upload/{category}/multiple": {
+        post: {
+          tags: ["Upload"],
+          summary: "Upload multiple files",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "category", in: "path", required: true, schema: { type: "string" } },
+          ],
+          requestBody: {
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    files: {
+                      type: "array",
+                      items: { type: "string", format: "binary" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: { 200: { description: "Uploaded successfully" } },
         },
       },
 

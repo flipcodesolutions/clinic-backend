@@ -44,12 +44,23 @@ function publicDoctor(user) {
   return data;
 }
 
+const getClinicId = async (req) => {
+  if (req?.user?.id) {
+    const cu = await ClinicUser.findOne({ where: { user_id: req.user.id } });
+    if (cu?.clinic_id) return cu.clinic_id;
+  }
+  const clinic = await Clinic.findOne({ attributes: ["id"], order: [["id", "ASC"]] });
+  return clinic ? clinic.id : 1;
+};
+
 const listDoctors = async (req, res) => {
   try {
     const { search, status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+
+    const targetClinicId = req.query.clinic_id || (await getClinicId(req));
 
     const where = {
       [Op.and]: [
@@ -73,24 +84,36 @@ const listDoctors = async (req, res) => {
       where.status = status;
     }
 
+    const include = [
+      {
+        model: DoctorProfile,
+        as: "doctorProfile",
+        include: [
+          { model: Department, as: "departments", attributes: ["id", "name"], through: { attributes: [] } },
+          { model: DoctorExperience, as: "experiences" },
+          { model: DoctorAchievement, as: "achievements" },
+          { model: DoctorSchedule, as: "schedules" },
+        ],
+      },
+    ];
+
+    if (targetClinicId) {
+      include.push({
+        model: ClinicUser,
+        as: "clinicUsers",
+        where: { clinic_id: targetClinicId },
+        attributes: [],
+      });
+    }
+
     const { count, rows: doctors } = await User.findAndCountAll({
       where,
       attributes: { exclude: ["password"] },
-      include: [
-        {
-          model: DoctorProfile,
-          as: "doctorProfile",
-          include: [
-            { model: Department, as: "departments", attributes: ["id", "name"], through: { attributes: [] } },
-            { model: DoctorExperience, as: "experiences" },
-            { model: DoctorAchievement, as: "achievements" },
-            { model: DoctorSchedule, as: "schedules" },
-          ],
-        },
-      ],
+      include,
       limit,
       offset,
       order: [["id", "DESC"]],
+      distinct: true,
     });
 
     return res.json({

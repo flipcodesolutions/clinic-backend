@@ -176,9 +176,64 @@ const updateServiceStatus = async (req, res) => {
   }
 };
 
+const syncClinicServices = async (req, res) => {
+  try {
+    const clinicId = await getClinicId(req);
+    const { service_ids } = req.body;
+
+    if (!Array.isArray(service_ids)) {
+      return res.status(400).json({ success: false, message: "service_ids array is required" });
+    }
+
+    const targetIds = service_ids.map((id) => parseInt(id)).filter(Boolean);
+
+    // Get all existing active clinic service records
+    const existingRecords = await ClinicService.findAll({
+      where: { clinic_id: clinicId },
+    });
+
+    const existingServiceIds = existingRecords.map((r) => r.service_id);
+
+    // Determine IDs to add and remove
+    const toAdd = targetIds.filter((id) => !existingServiceIds.includes(id));
+    const toRemove = existingServiceIds.filter((id) => !targetIds.includes(id));
+
+    if (toRemove.length > 0) {
+      await ClinicService.destroy({
+        where: { clinic_id: clinicId, service_id: toRemove },
+      });
+    }
+
+    for (const svcId of toAdd) {
+      const existingDeleted = await ClinicService.findOne({
+        where: { clinic_id: clinicId, service_id: svcId },
+        paranoid: false,
+      });
+
+      if (existingDeleted) {
+        await existingDeleted.restore();
+      } else {
+        await ClinicService.create({
+          clinic_id: clinicId,
+          service_id: svcId,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Clinic services saved successfully",
+      savedCount: targetIds.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   listClinicServices,
   assignService,
   removeService,
   updateServiceStatus,
+  syncClinicServices,
 };

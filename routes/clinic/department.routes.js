@@ -4,6 +4,8 @@ const controller = require("../../controllers/clinic/department.controller");
 const router = express.Router();
 
 router.get("/", controller.listClinicDepartments);
+router.post("/sync", controller.syncClinicDepartments);
+router.put("/sync", controller.syncClinicDepartments);
 router.post("/", controller.assignDepartment);
 router.put("/:id/status", controller.updateDepartmentStatus);
 router.delete("/:id", controller.removeDepartment);

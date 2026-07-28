@@ -169,9 +169,65 @@ const updateDepartmentStatus = async (req, res) => {
   }
 };
 
+const syncClinicDepartments = async (req, res) => {
+  try {
+    const clinicId = await getClinicId(req);
+    const { department_ids } = req.body;
+
+    if (!Array.isArray(department_ids)) {
+      return res.status(400).json({ success: false, message: "department_ids array is required" });
+    }
+
+    const targetIds = department_ids.map((id) => parseInt(id)).filter(Boolean);
+
+    // Get all existing active clinic department records
+    const existingRecords = await ClinicDepartment.findAll({
+      where: { clinic_id: clinicId },
+    });
+
+    const existingDeptIds = existingRecords.map((r) => r.department_id);
+
+    // Determine IDs to add and remove
+    const toAdd = targetIds.filter((id) => !existingDeptIds.includes(id));
+    const toRemove = existingDeptIds.filter((id) => !targetIds.includes(id));
+
+    if (toRemove.length > 0) {
+      await ClinicDepartment.destroy({
+        where: { clinic_id: clinicId, department_id: toRemove },
+      });
+    }
+
+    for (const deptId of toAdd) {
+      const existingDeleted = await ClinicDepartment.findOne({
+        where: { clinic_id: clinicId, department_id: deptId },
+        paranoid: false,
+      });
+
+      if (existingDeleted) {
+        await existingDeleted.restore();
+      } else {
+        await ClinicDepartment.create({
+          clinic_id: clinicId,
+          department_id: deptId,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Clinic departments saved successfully",
+      savedCount: targetIds.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   listClinicDepartments,
   assignDepartment,
   removeDepartment,
   updateDepartmentStatus,
+  syncClinicDepartments,
 };
+

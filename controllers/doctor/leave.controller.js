@@ -59,8 +59,29 @@ const updateLeave = async (req, res) => {
   }
 };
 
+const deleteLeave = async (req, res) => {
+  try {
+    const profile = await getDoctorProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ success: false, message: "Doctor profile not found" });
+    }
+    const leave = await DoctorLeave.findOne({
+      where: { id: req.params.id, doctor_id: profile.id },
+    });
+    if (!leave) {
+      return res.status(404).json({ success: false, message: "Leave request not found" });
+    }
+    await leave.destroy();
+    return res.json({ success: true, message: "Leave request cancelled successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   listLeaves,
   createLeave,
   updateLeave,
+  deleteLeave,
 };
+

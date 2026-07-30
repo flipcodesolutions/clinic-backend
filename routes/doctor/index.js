@@ -42,6 +42,7 @@ router.delete("/schedules/:id", scheduleController.deleteSchedule);
 router.get("/leaves", leaveController.listLeaves);
 router.post("/leaves", leaveController.createLeave);
 router.put("/leaves/:id", leaveController.updateLeave);
+router.delete("/leaves/:id", leaveController.deleteLeave);
 
 // Doctor Appointments
 router.get("/appointments", appointmentController.listAppointments);

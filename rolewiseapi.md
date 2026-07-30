@@ -49,6 +49,8 @@ Roles (from `users.roles` JSON): `super_admin`, `doctor`, `patient`, `receptioni
 | PUT | `/leaves/:id` | Update leave |
 | GET | `/appointments` | My appointments |
 | PUT | `/appointments/:id/status` | Update appointment status |
+| GET | `/patients` | List patients who visited doctor |
+| GET | `/patients/:id` | Get patient details & medical history |
 | POST | `/medical-records` | Create clinical notes |
 | GET | `/medical-records/:appointmentId` | Get notes by appointment |
 | POST | `/prescriptions` | Create prescription |

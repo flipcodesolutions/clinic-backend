@@ -1,4 +1,4 @@
-const { DoctorSchedule } = require("../../models");
+const { DoctorSchedule, Clinic } = require("../../models");
 const { getDoctorProfile } = require("./helpers");
 
 const listSchedules = async (req, res) => {
@@ -9,6 +9,14 @@ const listSchedules = async (req, res) => {
     }
     const schedules = await DoctorSchedule.findAll({
       where: { doctor_id: profile.id },
+      include: [
+        {
+          model: Clinic,
+          as: "clinic",
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
     });
     return res.json({ success: true, data: schedules });
   } catch (error) {

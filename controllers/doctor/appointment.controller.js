@@ -1,4 +1,4 @@
-const { Appointment, AppointmentStatusHistory } = require("../../models");
+const { Appointment, AppointmentStatusHistory, PatientProfile, User, Clinic, Department } = require("../../models");
 const { getDoctorProfile } = require("./helpers");
 
 const listAppointments = async (req, res) => {
@@ -9,6 +9,34 @@ const listAppointments = async (req, res) => {
     }
     const appointments = await Appointment.findAll({
       where: { doctor_id: profile.id },
+      include: [
+        {
+          model: PatientProfile,
+          as: "patient",
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["id", "first_name", "last_name", "email", "phone"],
+            },
+          ],
+        },
+        {
+          model: Clinic,
+          as: "clinic",
+          attributes: ["id", "name"],
+        },
+        {
+          model: Department,
+          as: "department",
+          attributes: ["id", "name"],
+        },
+        {
+          model: User,
+          as: "bookedByUser",
+          attributes: ["id", "first_name", "last_name"],
+        },
+      ],
       order: [["appointment_date", "DESC"], ["start_time", "DESC"]],
     });
     return res.json({ success: true, data: appointments });

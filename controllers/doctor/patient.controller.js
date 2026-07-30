@@ -49,7 +49,7 @@ const listPatients = async (req, res) => {
         { first_name: { [Op.like]: `%${search}%` } },
         { last_name: { [Op.like]: `%${search}%` } },
         { email: { [Op.like]: `%${search}%` } },
-        { mobile: { [Op.like]: `%${search}%` } },
+        { phone: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -59,7 +59,7 @@ const listPatients = async (req, res) => {
         {
           model: User,
           as: "user",
-          attributes: ["id", "first_name", "last_name", "email", "mobile", "profile_photo", "status"],
+          attributes: ["id", "first_name", "last_name", "email", "phone", "profile_image", "status"],
           where: Object.keys(userWhere).length > 0 ? userWhere : undefined,
         },
       ],
@@ -91,7 +91,7 @@ const getPatientDetails = async (req, res) => {
         {
           model: User,
           as: "user",
-          attributes: ["id", "first_name", "last_name", "email", "mobile", "profile_photo", "status"],
+          attributes: ["id", "first_name", "last_name", "email", "phone", "profile_image", "status"],
         },
         {
           model: PatientDocument,

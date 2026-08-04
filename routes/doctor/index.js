@@ -22,12 +22,14 @@ router.put("/profile", profileController.updateProfile);
 
 // Doctor Experiences
 router.get("/experiences", experienceController.listExperiences);
+router.get("/experiences/:id", experienceController.getExperienceById);
 router.post("/experiences", experienceController.createExperience);
 router.put("/experiences/:id", experienceController.updateExperience);
 router.delete("/experiences/:id", experienceController.deleteExperience);
 
 // Doctor Achievements
 router.get("/achievements", achievementController.listAchievements);
+router.get("/achievements/:id", achievementController.getAchievementById);
 router.post("/achievements", achievementController.createAchievement);
 router.put("/achievements/:id", achievementController.updateAchievement);
 router.delete("/achievements/:id", achievementController.deleteAchievement);

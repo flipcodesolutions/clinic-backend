@@ -58,6 +58,12 @@ const DoctorSchedule = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
+
+    shift_type: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'morning',
+    },
   },
   {
     tableName: "doctor_schedules",

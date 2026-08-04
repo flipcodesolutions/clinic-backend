@@ -324,6 +324,15 @@ async function syncDatabase({ alter = false, force = false } = {}) {
   await sequelize.ensureDatabase();
   await sequelize.authenticate();
   await sequelize.sync({ alter, force });
+  try {
+    const [cols] = await sequelize.query("SHOW COLUMNS FROM doctor_schedules LIKE 'shift_type'");
+    if (!cols || cols.length === 0) {
+      await sequelize.query("ALTER TABLE doctor_schedules ADD COLUMN shift_type VARCHAR(50) DEFAULT 'morning'");
+      console.log("✓ Added shift_type column to doctor_schedules table");
+    }
+  } catch (err) {
+    // Table might not exist yet before sync
+  }
   console.log("Database synced successfully");
 }
 

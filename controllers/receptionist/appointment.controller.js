@@ -57,7 +57,14 @@ const createAppointment = async (req, res) => {
       consultation_type,
       reason,
       booked_by: req.user.id,
-      status: "scheduled",
+      status: "booked",
+    });
+
+    await AppointmentStatusHistory.create({
+      appointment_id: appointment.id,
+      status: "booked",
+      changed_by: req.user.id,
+      remarks: "Appointment created by receptionist",
     });
 
     return res.status(201).json({ success: true, data: appointment });

@@ -48,6 +48,7 @@ router.delete("/leaves/:id", leaveController.deleteLeave);
 
 // Doctor Appointments
 router.get("/appointments", appointmentController.listAppointments);
+router.put("/appointments/bulk-status", appointmentController.bulkUpdateAppointmentStatus);
 router.put("/appointments/:id/status", appointmentController.updateAppointmentStatus);
 
 // Doctor Patients

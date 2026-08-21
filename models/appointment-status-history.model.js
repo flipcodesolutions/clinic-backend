@@ -17,10 +17,8 @@ const AppointmentStatusHistory = sequelize.define(
 
     status: {
       type: DataTypes.ENUM(
-        "scheduled",
+        "booked",
         "confirmed",
-        "checked_in",
-        "in_progress",
         "completed",
         "cancelled",
         "no_show"

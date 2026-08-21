@@ -166,12 +166,12 @@ const bookAppointment = async (req, res) => {
       consultation_type: consultation_type || "in_person",
       reason: reason || null,
       booked_by: req.user.id,
-      status: "scheduled",
+      status: "booked",
     });
 
     await AppointmentStatusHistory.create({
       appointment_id: appointment.id,
-      status: "scheduled",
+      status: "booked",
       changed_by: req.user.id,
       remarks: "Appointment booked by patient",
     });

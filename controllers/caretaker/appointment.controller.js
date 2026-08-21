@@ -1,4 +1,4 @@
-const { PatientCareTaker, Appointment } = require("../../models");
+const { PatientCareTaker, Appointment, AppointmentStatusHistory } = require("../../models");
 const { getCareTakerProfile } = require("./helpers");
 
 const listAppointments = async (req, res) => {
@@ -79,7 +79,14 @@ const bookAppointment = async (req, res) => {
       consultation_type,
       reason,
       booked_by: req.user.id,
-      status: "scheduled",
+      status: "booked",
+    });
+
+    await AppointmentStatusHistory.create({
+      appointment_id: appointment.id,
+      status: "booked",
+      changed_by: req.user.id,
+      remarks: "Appointment booked by caretaker",
     });
 
     return res.status(201).json({ success: true, data: appointment });

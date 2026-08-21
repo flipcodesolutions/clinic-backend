@@ -33,16 +33,20 @@ function dateWithOffset(days) {
 
 function historyStatuses(finalStatus) {
   if (finalStatus === "completed") {
-    return ["scheduled", "confirmed", "checked_in", "in_progress", "completed"];
+    return ["booked", "confirmed", "completed"];
   }
 
   if (finalStatus === "cancelled") {
-    return ["scheduled", "confirmed", "cancelled"];
+    return ["booked", "cancelled"];
+  }
+
+  if (finalStatus === "no_show") {
+    return ["booked", "confirmed", "no_show"];
   }
 
   return finalStatus === "confirmed"
-    ? ["scheduled", "confirmed"]
-    : ["scheduled"];
+    ? ["booked", "confirmed"]
+    : ["booked"];
 }
 
 async function seedStatusHistory(appointment, changedBy) {
@@ -116,7 +120,7 @@ async function seedAppointments(
         const department = departmentByName[doctor.profile.specialization];
         const status = isPast
           ? PAST_STATUSES[slot]
-          : faker.helpers.arrayElement(["scheduled", "confirmed"]);
+          : faker.helpers.arrayElement(["booked", "confirmed"]);
         const dayOffset = isPast
           ? -(15 + patientIndex * 3 + slot * 12)
           : 7 + (patientIndex % 20);

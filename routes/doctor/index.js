@@ -11,6 +11,7 @@ const appointmentController = require("../../controllers/doctor/appointment.cont
 const patientController = require("../../controllers/doctor/patient.controller");
 const medicalRecordController = require("../../controllers/doctor/medical-record.controller");
 const prescriptionController = require("../../controllers/doctor/prescription.controller");
+const authController = require("../../controllers/comman/auth.controller");
 
 const router = express.Router();
 
@@ -62,5 +63,8 @@ router.get("/medical-records/:appointmentId", medicalRecordController.getMedical
 // Prescriptions
 router.post("/prescriptions", prescriptionController.createPrescription);
 router.get("/prescriptions/:appointmentId", prescriptionController.getPrescription);
+
+// Change Password
+router.put("/change-password", authController.changePassword);
 
 module.exports = router;

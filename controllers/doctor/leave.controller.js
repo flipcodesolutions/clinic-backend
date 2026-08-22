@@ -71,8 +71,8 @@ const deleteLeave = async (req, res) => {
     if (!leave) {
       return res.status(404).json({ success: false, message: "Leave request not found" });
     }
-    await leave.destroy();
-    return res.json({ success: true, message: "Leave request cancelled successfully" });
+await leave.destroy({ force: true });   
+ return res.json({ success: true, message: "Leave request cancelled successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

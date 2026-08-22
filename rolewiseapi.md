@@ -55,6 +55,7 @@ Roles (from `users.roles` JSON): `super_admin`, `doctor`, `patient`, `receptioni
 | GET | `/medical-records/:appointmentId` | Get notes by appointment |
 | POST | `/prescriptions` | Create prescription |
 | GET | `/prescriptions/:appointmentId` | Get prescription |
+| PUT | `/change-password` | Change doctor password |
 
 ---
 

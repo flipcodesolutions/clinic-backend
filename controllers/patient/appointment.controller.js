@@ -166,14 +166,14 @@ const bookAppointment = async (req, res) => {
       consultation_type: consultation_type || "in_person",
       reason: reason || null,
       booked_by: req.user.id,
-      status: "booked",
+      status: "confirmed",
     });
 
     await AppointmentStatusHistory.create({
       appointment_id: appointment.id,
-      status: "booked",
+      status: "confirmed",
       changed_by: req.user.id,
-      remarks: "Appointment booked by patient",
+      remarks: "Appointment booked and confirmed",
     });
 
     const fullAppointment = await Appointment.findByPk(appointment.id, {

@@ -112,6 +112,10 @@ Clinic.hasMany(ClinicGallery, { foreignKey: "clinic_id", as: "galleries" });
 ClinicGallery.belongsTo(Clinic, { foreignKey: "clinic_id", as: "clinic" });
 ClinicGallery.belongsTo(User, { foreignKey: "uploaded_by", as: "uploader" });
 
+// Department self-referencing associations (Parent / Sub-department categories)
+Department.belongsTo(Department, { foreignKey: "parent_id", as: "parent" });
+Department.hasMany(Department, { foreignKey: "parent_id", as: "subDepartments" });
+
 // Doctor associations
 DoctorProfile.belongsToMany(Department, {
   through: DoctorDepartment,
@@ -330,8 +334,26 @@ async function syncDatabase({ alter = false, force = false } = {}) {
       await sequelize.query("ALTER TABLE doctor_schedules ADD COLUMN shift_type VARCHAR(50) DEFAULT 'morning'");
       console.log("✓ Added shift_type column to doctor_schedules table");
     }
+
+    const [deptCols] = await sequelize.query("SHOW COLUMNS FROM departments LIKE 'parent_id'");
+    if (!deptCols || deptCols.length === 0) {
+      await sequelize.query("ALTER TABLE departments ADD COLUMN parent_id BIGINT UNSIGNED NULL, ADD COLUMN is_parent BOOLEAN DEFAULT FALSE");
+      console.log("✓ Added parent_id and is_parent columns to departments table");
+    }
+
+    const [videoCols] = await sequelize.query("SHOW COLUMNS FROM doctor_profiles LIKE 'offers_video_consult'");
+    if (!videoCols || videoCols.length === 0) {
+      await sequelize.query("ALTER TABLE doctor_profiles ADD COLUMN offers_video_consult BOOLEAN DEFAULT FALSE");
+      console.log("✓ Added offers_video_consult column to doctor_profiles table");
+    }
+
+    const [mapCols] = await sequelize.query("SHOW COLUMNS FROM clinics LIKE 'google_maps_url'");
+    if (!mapCols || mapCols.length === 0) {
+      await sequelize.query("ALTER TABLE clinics ADD COLUMN google_maps_url TEXT NULL");
+      console.log("✓ Added google_maps_url column to clinics table");
+    }
   } catch (err) {
-    // Table might not exist yet before sync
+    // Table might not exist yet before sync or already exists
   }
   console.log("Database synced successfully");
 }

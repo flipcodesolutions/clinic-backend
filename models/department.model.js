@@ -10,6 +10,20 @@ const Department = sequelize.define(
       primaryKey: true,
     },
 
+    parent_id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: "departments",
+        key: "id",
+      },
+    },
+
+    is_parent: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+
     name: {
       type: DataTypes.STRING(100),
       allowNull: false,

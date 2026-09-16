@@ -8,6 +8,9 @@ const {
   DoctorSchedule,
   Review,
   Clinic,
+  PatientProfile,
+  Service,
+  ClinicGallery,
 } = require("../../models");
 
 const listDoctors = async (req, res) => {
@@ -19,11 +22,39 @@ const listDoctors = async (req, res) => {
       where.specialization = { [Op.like]: `%${specialization.trim()}%` };
     }
 
-    const userWhere = {};
-    if (search) {
-      userWhere[Op.or] = [
-        { first_name: { [Op.like]: `%${search.trim()}%` } },
-        { last_name: { [Op.like]: `%${search.trim()}%` } },
+    if (search && search.trim()) {
+      const q = search.trim();
+      const matchingUsers = await User.findAll({
+        where: {
+          [Op.or]: [
+            { first_name: { [Op.like]: `%${q}%` } },
+            { last_name: { [Op.like]: `%${q}%` } },
+          ],
+        },
+        attributes: ["id"],
+      });
+      const matchingUserIds = matchingUsers.map((u) => u.id);
+
+      const matchingClinics = await Clinic.findAll({
+        where: {
+          name: { [Op.like]: `%${q}%` },
+        },
+        attributes: ["id"],
+      });
+      const matchingClinicIds = matchingClinics.map((c) => c.id);
+
+      const matchingSchedules = matchingClinicIds.length > 0
+        ? await DoctorSchedule.findAll({
+            where: { clinic_id: { [Op.in]: matchingClinicIds } },
+            attributes: ["doctor_profile_id"],
+          })
+        : [];
+      const doctorIdsFromSchedules = matchingSchedules.map((s) => s.doctor_profile_id);
+
+      where[Op.or] = [
+        { specialization: { [Op.like]: `%${q}%` } },
+        ...(matchingUserIds.length > 0 ? [{ user_id: { [Op.in]: matchingUserIds } }] : []),
+        ...(doctorIdsFromSchedules.length > 0 ? [{ id: { [Op.in]: doctorIdsFromSchedules } }] : []),
       ];
     }
 
@@ -39,7 +70,23 @@ const listDoctors = async (req, res) => {
     const scheduleInclude = {
       model: DoctorSchedule,
       as: "schedules",
-      include: [{ model: Clinic, as: "clinic" }],
+      include: [
+        {
+          model: Clinic,
+          as: "clinic",
+          include: [
+            {
+              model: Service,
+              as: "services",
+              through: { attributes: [] },
+            },
+            {
+              model: ClinicGallery,
+              as: "galleries",
+            },
+          ],
+        },
+      ],
     };
     if (clinic_id) {
       scheduleInclude.where = { clinic_id };
@@ -52,10 +99,33 @@ const listDoctors = async (req, res) => {
           model: User,
           as: "user",
           attributes: ["id", "first_name", "last_name", "email", "phone", "profile_image"],
-          where: Object.keys(userWhere).length ? userWhere : undefined,
+          include: [
+            {
+              model: Clinic,
+              as: "clinics",
+              attributes: ["id", "name", "address", "city", "phone", "email", "latitude", "longitude", "google_maps_url"],
+              through: { attributes: [] },
+              include: [
+                {
+                  model: Service,
+                  as: "services",
+                  through: { attributes: [] },
+                },
+                {
+                  model: ClinicGallery,
+                  as: "galleries",
+                },
+              ],
+            },
+          ],
         },
         departmentInclude,
         scheduleInclude,
+        {
+          model: Review,
+          as: "reviews",
+          attributes: ["id", "rating"],
+        },
       ],
       order: [["id", "DESC"]],
     });
@@ -80,6 +150,14 @@ const getDoctorProfile = async (req, res) => {
           model: User,
           as: "user",
           attributes: ["id", "first_name", "last_name", "email", "phone", "profile_image"],
+          include: [
+            {
+              model: Clinic,
+              as: "clinics",
+              attributes: ["id", "name", "address", "city", "phone", "email", "latitude", "longitude", "google_maps_url"],
+              through: { attributes: [] },
+            },
+          ],
         },
         {
           model: Department,
@@ -104,9 +182,15 @@ const getDoctorProfile = async (req, res) => {
           as: "reviews",
           include: [
             {
-              model: User,
-              as: "patientUser",
-              attributes: ["first_name", "last_name"],
+              model: PatientProfile,
+              as: "patient",
+              include: [
+                {
+                  model: User,
+                  as: "user",
+                  attributes: ["first_name", "last_name"],
+                },
+              ],
             },
           ],
         },
@@ -117,7 +201,95 @@ const getDoctorProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "Doctor not found" });
     }
 
-    return res.json({ success: true, data: doctor });
+    const doctorJson = doctor.toJSON();
+
+    // Fetch active clinic's services and galleries
+    const primaryClinicId =
+      doctorJson.schedules?.[0]?.clinic_id ||
+      doctorJson.schedules?.[0]?.clinic?.id ||
+      doctorJson.user?.clinics?.[0]?.id;
+
+    if (primaryClinicId) {
+      const fullClinic = await Clinic.findByPk(primaryClinicId, {
+        include: [
+          {
+            model: Service,
+            as: "services",
+            through: { attributes: [] },
+          },
+          {
+            model: ClinicGallery,
+            as: "galleries",
+          },
+        ],
+      });
+
+      if (fullClinic) {
+        doctorJson.clinic = fullClinic.toJSON();
+      }
+
+      try {
+        // Fetch all doctors practicing in this clinic
+        const clinicDoctorProfiles = await DoctorProfile.findAll({
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["id", "first_name", "last_name", "email", "phone", "profile_image"],
+              include: [
+                {
+                  model: Clinic,
+                  as: "clinics",
+                  where: { id: primaryClinicId },
+                  attributes: ["id", "name"],
+                  through: { attributes: [] },
+                  required: false,
+                },
+              ],
+            },
+            {
+              model: Department,
+              as: "departments",
+              through: { attributes: [] },
+            },
+            {
+              model: DoctorSchedule,
+              as: "schedules",
+              where: { clinic_id: primaryClinicId },
+              required: false,
+            },
+            {
+              model: Review,
+              as: "reviews",
+              attributes: ["id", "rating"],
+            },
+          ],
+        });
+
+        const matchedDoctors = clinicDoctorProfiles
+          .filter((d) => {
+            const hasClinicInUser = d.user?.clinics?.some((c) => Number(c.id) === Number(primaryClinicId));
+            const hasClinicSchedule = d.schedules?.some((s) => Number(s.clinic_id) === Number(primaryClinicId));
+            const isCurrentDoc = Number(d.id) === Number(doctorJson.id);
+            return hasClinicInUser || hasClinicSchedule || isCurrentDoc;
+          })
+          .map((d) => d.toJSON());
+
+        const alreadyHasCurrent = matchedDoctors.some((d) => Number(d.id) === Number(doctorJson.id));
+        if (!alreadyHasCurrent) {
+          matchedDoctors.unshift(doctorJson);
+        }
+
+        doctorJson.clinicDoctors = matchedDoctors;
+      } catch (err) {
+        console.error("Error fetching clinic doctors:", err);
+        doctorJson.clinicDoctors = [doctorJson];
+      }
+    } else {
+      doctorJson.clinicDoctors = [doctorJson];
+    }
+
+    return res.json({ success: true, data: doctorJson });
   } catch (error) {
     console.error("Error getting doctor profile for patient:", error);
     return res.status(500).json({ success: false, message: error.message });

@@ -16,7 +16,7 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { first_name, last_name, profile_photo, consultation_fee, languages, gender, dob, bio } = req.body;
+    const { first_name, last_name, profile_photo, consultation_fee, languages, gender, dob, bio, offers_video_consult } = req.body;
 
     // 1. Update User fields (first_name, last_name, profile_image)
     const userUpdates = {};
@@ -37,6 +37,7 @@ const updateProfile = async (req, res) => {
     if (dob !== undefined) profileUpdates.dob = dob;
     if (bio !== undefined) profileUpdates.bio = bio;
     if (profile_photo !== undefined) profileUpdates.profile_image = profile_photo;
+    if (offers_video_consult !== undefined) profileUpdates.offers_video_consult = Boolean(offers_video_consult);
 
     if (!profile) {
       profile = await DoctorProfile.create({ user_id: req.user.id, ...profileUpdates });

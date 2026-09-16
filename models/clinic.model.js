@@ -80,6 +80,11 @@ const Clinic = sequelize.define(
       allowNull: true,
     },
 
+    google_maps_url: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
     description: {
       type: DataTypes.TEXT,
       allowNull: true,

@@ -77,6 +77,12 @@ const DoctorProfile = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+
+    offers_video_consult: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+    },
   },
   {
     tableName: "doctor_profiles",

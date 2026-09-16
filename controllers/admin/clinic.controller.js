@@ -49,9 +49,70 @@ const listClinics = async (req, res) => {
   }
 };
 
+const resolveGoogleMapCoordinates = async (url) => {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+
+  // Try direct regex first on provided URL
+  let targetUrl = decodeURIComponent(trimmed);
+  const mPlaceDirect = targetUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (mPlaceDirect) return { lat: parseFloat(mPlaceDirect[1]), lng: parseFloat(mPlaceDirect[2]) };
+
+  const mAtDirect = targetUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (mAtDirect) return { lat: parseFloat(mAtDirect[1]), lng: parseFloat(mAtDirect[2]) };
+
+  const mQDirect = targetUrl.match(/[?&]q=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+  if (mQDirect) return { lat: parseFloat(mQDirect[1]), lng: parseFloat(mQDirect[2]) };
+
+  // If it's a short URL, resolve redirect
+  if (trimmed.includes("goo.gl") || trimmed.includes("maps.app") || trimmed.includes("bit.ly")) {
+    try {
+      const resp = await fetch(trimmed, { redirect: "follow" });
+      if (resp && resp.url) {
+        const resolved = decodeURIComponent(resp.url);
+        const mPlace = resolved.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+        if (mPlace) return { lat: parseFloat(mPlace[1]), lng: parseFloat(mPlace[2]), resolvedUrl: resp.url };
+
+        const mAt = resolved.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (mAt) return { lat: parseFloat(mAt[1]), lng: parseFloat(mAt[2]), resolvedUrl: resp.url };
+
+        const mQ = resolved.match(/[?&]q=(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/i);
+        if (mQ) return { lat: parseFloat(mQ[1]), lng: parseFloat(mQ[2]), resolvedUrl: resp.url };
+      }
+    } catch (e) {
+      console.warn("Failed to resolve short map url:", e.message);
+    }
+  }
+
+  return null;
+};
+
+const resolveMapUrl = async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, message: "URL is required" });
+    }
+    const result = await resolveGoogleMapCoordinates(url);
+    if (!result) {
+      return res.json({ success: false, message: "Could not extract coordinates from link" });
+    }
+    return res.json({
+      success: true,
+      data: {
+        latitude: result.lat,
+        longitude: result.lng,
+        resolvedUrl: result.resolvedUrl || url,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const createClinic = async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, google_maps_url } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, message: "Clinic name is required" });
     }
@@ -61,8 +122,21 @@ const createClinic = async (req, res) => {
         return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits" });
       }
     }
+
+    let lat = req.body.latitude;
+    let lng = req.body.longitude;
+    if (google_maps_url) {
+      const resolved = await resolveGoogleMapCoordinates(google_maps_url);
+      if (resolved) {
+        lat = resolved.lat;
+        lng = resolved.lng;
+      }
+    }
+
     const clinic = await Clinic.create({
       ...req.body,
+      latitude: lat ? parseFloat(lat) : null,
+      longitude: lng ? parseFloat(lng) : null,
       created_by: req.user ? req.user.id : null,
     });
     return res.status(201).json({ success: true, data: clinic });
@@ -103,7 +177,16 @@ const updateClinic = async (req, res) => {
       deleteOldFile(clinic.photo);
     }
 
-    await clinic.update(req.body);
+    const updatePayload = { ...req.body };
+    if (req.body.google_maps_url && (!req.body.latitude || !req.body.longitude || req.body.google_maps_url !== clinic.google_maps_url)) {
+      const resolved = await resolveGoogleMapCoordinates(req.body.google_maps_url);
+      if (resolved) {
+        updatePayload.latitude = resolved.lat;
+        updatePayload.longitude = resolved.lng;
+      }
+    }
+
+    await clinic.update(updatePayload);
     return res.json({ success: true, data: clinic });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -175,4 +258,5 @@ module.exports = {
   deleteClinic,
   getCurrentClinicProfile,
   updateCurrentClinicProfile,
+  resolveMapUrl,
 };

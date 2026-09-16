@@ -151,6 +151,7 @@ const createDoctor = async (req, res) => {
       gender,
       dob,
       photo_url,
+      offers_video_consult,
     } = req.body;
 
     if (!first_name || !email || !phone || !password) {
@@ -195,6 +196,7 @@ const createDoctor = async (req, res) => {
       gender: (gender && String(gender).trim() !== '') ? gender.toLowerCase() : null,
       dob: (dob && String(dob).trim() !== '') ? dob : null,
       profile_image: photo_url || null,
+      offers_video_consult: Boolean(offers_video_consult === true || offers_video_consult === 'true' || offers_video_consult === 1),
     });
 
     if (department_id) {
@@ -268,6 +270,7 @@ const updateDoctor = async (req, res) => {
       gender,
       dob,
       photo_url,
+      offers_video_consult,
     } = req.body;
 
     if (email && email !== user.email) {
@@ -314,6 +317,9 @@ const updateDoctor = async (req, res) => {
     if (gender !== undefined) profileData.gender = (gender && String(gender).trim() !== '') ? gender.toLowerCase() : null;
     if (dob !== undefined) profileData.dob = (dob && String(dob).trim() !== '') ? dob : null;
     if (photo_url !== undefined) profileData.profile_image = photo_url || null;
+    if (offers_video_consult !== undefined) {
+      profileData.offers_video_consult = Boolean(offers_video_consult === true || offers_video_consult === 'true' || offers_video_consult === 1);
+    }
 
     if (Object.keys(profileData).length > 0 || department_id !== undefined || experiences !== undefined || achievements !== undefined || schedules !== undefined) {
       const existingProfile = await DoctorProfile.findOne({ where: { user_id: user.id } });

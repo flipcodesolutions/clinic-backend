@@ -23,6 +23,24 @@ const QUALIFICATIONS = {
   Dentist: "BDS, MDS",
 };
 
+const DOCTOR_AVATARS_MALE = [
+  "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1622902046580-2b47f47f5471?auto=format&fit=crop&q=80&w=300&h=300",
+];
+
+const DOCTOR_AVATARS_FEMALE = [
+  "https://images.unsplash.com/photo-1594824813689-5374beaa8a04?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1651008376811-b90baee60c1f?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1527613426441-4da17471b66d?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1638202993928-7267aad84c31?auto=format&fit=crop&q=80&w=300&h=300",
+  "https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&q=80&w=300&h=300",
+];
+
 function clinicSlug(clinic) {
   const found = HOSPITALS.find((h) => h.name === clinic.name);
   return found ? found.slug : slugify(clinic.name);
@@ -31,6 +49,7 @@ function clinicSlug(clinic) {
 async function seedDoctors(clinics) {
   const passwordHash = await hashDefaultPassword();
   const doctorsByClinic = {};
+  let avatarIndex = 0;
 
   for (const clinic of clinics) {
     doctorsByClinic[clinic.id] = [];
@@ -42,6 +61,10 @@ async function seedDoctors(clinics) {
       const email = stableEmail("dr", cSlug, specialization);
       const phone = uniquePhone();
 
+      const avatarList = gender === "female" ? DOCTOR_AVATARS_FEMALE : DOCTOR_AVATARS_MALE;
+      const profile_image = avatarList[avatarIndex % avatarList.length];
+      avatarIndex += 1;
+
       const user = await upsertUser({
         first_name,
         last_name,
@@ -49,7 +72,7 @@ async function seedDoctors(clinics) {
         phone,
         roles: ["doctor"],
         passwordHash,
-        profile_image: "https://placehold.co/150x150?text=Dr",
+        profile_image,
       });
 
       const [profile] = await DoctorProfile.findOrCreate({
@@ -78,6 +101,8 @@ async function seedDoctors(clinics) {
         specialization,
         qualification: QUALIFICATIONS[specialization],
         department: specialization,
+        gender,
+        profile_image: user.profile_image,
       });
 
       await ClinicUser.findOrCreate({

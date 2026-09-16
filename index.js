@@ -15,6 +15,7 @@ const receptionistRoutes = require('./routes/receptionist');
 const caretakerRoutes = require('./routes/caretaker');
 const staffRoutes = require('./routes/staff');
 const uploadRoutes = require('./routes/upload.routes');
+const visitorRoutes = require('./routes/visitor.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,6 +42,7 @@ app.use('/api/receptionist', receptionistRoutes);
 app.use('/api/caretaker', caretakerRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/visitor', visitorRoutes);
 
 async function start() {
   try {

@@ -219,16 +219,38 @@ const createSchedule = async (req, res) => {
       return res.status(404).json({ success: false, message: "Doctor profile not found" });
     }
 
-    const validationError = await validateSchedulePayload(profile, req.body, req.user);
+    const shiftType = req.body.shift_type ? String(req.body.shift_type).toLowerCase() : "morning";
+    const dayOfWeek = String(req.body.day_of_week).toLowerCase();
+
+    // Check if a record already exists for this exact day and shift
+    const existing = await DoctorSchedule.findOne({
+      where: {
+        doctor_id: profile.id,
+        clinic_id: parseInt(req.body.clinic_id, 10),
+        day_of_week: dayOfWeek,
+        shift_type: shiftType,
+      },
+    });
+
+    const validationError = await validateSchedulePayload(profile, req.body, req.user, existing ? existing.id : null);
     if (validationError) {
       return res.status(400).json({ success: false, message: validationError });
+    }
+
+    if (existing) {
+      await existing.update({
+        ...req.body,
+        day_of_week: dayOfWeek,
+        shift_type: shiftType,
+      });
+      return res.status(200).json({ success: true, data: existing });
     }
 
     const schedule = await DoctorSchedule.create({
       ...req.body,
       doctor_id: profile.id,
-      day_of_week: String(req.body.day_of_week).toLowerCase(),
-      shift_type: req.body.shift_type ? String(req.body.shift_type).toLowerCase() : "morning",
+      day_of_week: dayOfWeek,
+      shift_type: shiftType,
     });
     return res.status(201).json({ success: true, data: schedule });
   } catch (error) {

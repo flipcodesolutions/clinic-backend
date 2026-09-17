@@ -1,11 +1,9 @@
 const { Op } = require("sequelize");
 const {
   Clinic,
-  City,
   Department,
   Service,
   ClinicGallery,
-  ClinicService,
 } = require("../../models");
 
 const listClinics = async (req, res) => {

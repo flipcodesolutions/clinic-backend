@@ -1,4 +1,3 @@
-const { User } = require("../models");
 const { hashDefaultPassword, upsertUser } = require("./helpers/user.helper");
 
 async function seedSuperAdmin() {

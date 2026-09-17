@@ -9,8 +9,6 @@ const {
   Review,
   Clinic,
   PatientProfile,
-  Service,
-  ClinicGallery,
 } = require("../../models");
 
 const listDoctors = async (req, res) => {
@@ -141,9 +139,23 @@ const getDoctorProfile = async (req, res) => {
   try {
     const { id } = req.params;
 
+    let targetDoctorId = id;
+    let targetUserId = id;
+
+    if (String(id).startsWith("clinic-")) {
+      const clinicId = id.replace("clinic-", "");
+      const schedule = await DoctorSchedule.findOne({
+        where: { clinic_id: clinicId },
+      });
+      if (schedule && schedule.doctor_id) {
+        targetDoctorId = schedule.doctor_id;
+        targetUserId = schedule.doctor_id;
+      }
+    }
+
     const doctor = await DoctorProfile.findOne({
       where: {
-        [Op.or]: [{ id }, { user_id: id }],
+        [Op.or]: [{ id: targetDoctorId }, { user_id: targetUserId }],
       },
       include: [
         {

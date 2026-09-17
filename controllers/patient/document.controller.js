@@ -7,8 +7,14 @@ const listDocuments = async (req, res) => {
     if (!profile) {
       return res.status(404).json({ success: false, message: "Patient profile not found" });
     }
+
+    const where = { patient_id: profile.id };
+    if (req.query.document_type) {
+      where.document_type = req.query.document_type;
+    }
+
     const documents = await PatientDocument.findAll({
-      where: { patient_id: profile.id },
+      where,
       order: [["id", "DESC"]],
     });
     return res.json({ success: true, data: documents });
@@ -24,19 +30,27 @@ const createDocument = async (req, res) => {
       return res.status(404).json({ success: false, message: "Patient profile not found" });
     }
 
-    const { document_type, title, file_path } = req.body;
-    if (!document_type || !title || !file_path) {
+    const { document_type, title, file_path, lab_name, test_date } = req.body;
+    if (!document_type || !title) {
       return res.status(400).json({
         success: false,
-        message: "document_type, title and file_path are required",
+        message: "document_type and title are required",
       });
+    }
+
+    let finalTitle = title.trim();
+    if (lab_name) {
+      finalTitle += ` - ${lab_name.trim()}`;
+    }
+    if (test_date) {
+      finalTitle += ` (${test_date.trim()})`;
     }
 
     const document = await PatientDocument.create({
       patient_id: profile.id,
       document_type,
-      title,
-      file_path,
+      title: finalTitle,
+      file_path: file_path || "/uploads/placeholder-report.pdf",
       uploaded_by: req.user.id,
     });
 

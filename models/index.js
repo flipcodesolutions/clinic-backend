@@ -18,6 +18,8 @@ const DoctorLeave = require("./doctor-leave.model");
 const StaffProfile = require("./staff-profile.model");
 const PatientProfile = require("./patient-profile.model");
 const PatientDocument = require("./patient-document.model");
+const PatientShortlist = require("./patient-shortlist.model");
+const PatientFamilyMember = require("./patient-family.model");
 const CareTakerProfile = require("./caretaker-profile.model");
 const PatientCareTaker = require("./patient-caretaker.model");
 const Appointment = require("./appointment.model");
@@ -186,6 +188,34 @@ CareTakerProfile.belongsToMany(PatientProfile, {
   as: "patients",
 });
 
+// Patient Shortlist associations
+PatientProfile.hasMany(PatientShortlist, {
+  foreignKey: "patient_id",
+  as: "shortlists",
+});
+PatientShortlist.belongsTo(PatientProfile, {
+  foreignKey: "patient_id",
+  as: "patient",
+});
+DoctorProfile.hasMany(PatientShortlist, {
+  foreignKey: "doctor_id",
+  as: "shortlists",
+});
+PatientShortlist.belongsTo(DoctorProfile, {
+  foreignKey: "doctor_id",
+  as: "doctor",
+});
+
+// Patient Family Member associations
+PatientProfile.hasMany(PatientFamilyMember, {
+  foreignKey: "patient_id",
+  as: "familyMembers",
+});
+PatientFamilyMember.belongsTo(PatientProfile, {
+  foreignKey: "patient_id",
+  as: "patient",
+});
+
 // Appointment associations
 Appointment.belongsTo(Clinic, { foreignKey: "clinic_id", as: "clinic" });
 Appointment.belongsTo(DoctorProfile, { foreignKey: "doctor_id", as: "doctor" });
@@ -305,6 +335,8 @@ const db = {
   StaffProfile,
   PatientProfile,
   PatientDocument,
+  PatientShortlist,
+  PatientFamilyMember,
   CareTakerProfile,
   PatientCareTaker,
   Appointment,

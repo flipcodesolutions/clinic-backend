@@ -9,6 +9,8 @@ const {
   Review,
   Clinic,
   PatientProfile,
+  Service,
+  ClinicGallery,
 } = require("../../models");
 
 const listDoctors = async (req, res) => {
@@ -44,10 +46,10 @@ const listDoctors = async (req, res) => {
       const matchingSchedules = matchingClinicIds.length > 0
         ? await DoctorSchedule.findAll({
             where: { clinic_id: { [Op.in]: matchingClinicIds } },
-            attributes: ["doctor_profile_id"],
+            attributes: ["doctor_id"],
           })
         : [];
-      const doctorIdsFromSchedules = matchingSchedules.map((s) => s.doctor_profile_id);
+      const doctorIdsFromSchedules = matchingSchedules.map((s) => s.doctor_id);
 
       where[Op.or] = [
         { specialization: { [Op.like]: `%${q}%` } },
